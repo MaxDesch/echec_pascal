@@ -18,67 +18,18 @@ uses
   echec_utilitaire,
   Classes, SysUtils;
 
-const
-  SCREEN_WIDTH = 640;
-  SCREEN_HEIGHT = 480;
 
 var
-  window: PSDL_Window;
-  renderer: PSDL_Renderer;
+  partie : TPartie_echec;
   running: Boolean;
-  event: TSDL_Event;
-  rect : TSDL_Rect;
   x,y : Integer;
-  bouton : TBouton;
-  font : PTTF_Font;
-  echiquier: Techiquier;
 
 
 begin
-  if SDL_Init(SDL_INIT_VIDEO) <> 0 then
-  begin
-    Writeln('Unable to initialize SDL: ', SDL_GetError);
-    Halt(1);
-  end;
-
-  // Your game code would go here
-  window := SDL_CreateWindow('Echecs Pascal', SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_SHOWN);
-  if window = nil then
-  begin
-    Writeln('Could not create window: ', SDL_GetError);
-    SDL_Quit;
-    Halt(1);
-  end;
-  renderer := SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-  if renderer = nil then
-  begin
-    Writeln('Could not create renderer: ', SDL_GetError);
-    SDL_DestroyWindow(window);
-    SDL_Quit;
-    Halt(1);
-  end;
-
-  if TTF_Init() = -1 then
-  begin
-    Writeln('Could not initialize TTF: ', TTF_GetError);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit;
-    Halt(1);
-  end;
-
-  font := TTF_OpenFont('C:/Windows/Fonts/arial.ttf', 50);
-  if font = nil then
-  begin
-    Writeln('Could not load font: ', TTF_GetError);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit;
-    Halt(1);
-  end;
+  InitialiserSDL;
   InitialiserTextures(renderer);
-  echiquier := InitialiserEchiquier();
-
+  partie := Initialisation_partie();
+  couleur_affichage := BLANC;
   running := True;
 
   while running do
@@ -92,27 +43,36 @@ begin
         SDL_MOUSEMOTION: 
         begin
         end;
+        SDL_MOUSEBUTTONDOWN :
+        begin
+          x := event.button.x div taille_case;
+          y := event.button.y div taille_case;
+          Writeln(x,'   ',y);
+          Writeln('piece : ',partie.echiquier.echiquier[7-y][7-x].piece);
+          Writeln(Length(partie.echiquier.echiquier[7-y][7-x].coups_autoriser));
+          gerer_clique(partie,x,y);
+
+        end;
         SDL_KEYDOWN: 
         begin
           case event.key.keysym.sym of
             SDLK_ESCAPE: running := False;
-            SDLK_a :
+            SDLK_z:
             begin
-            SDL_GetMouseState(@x, @y);
-             Writeln(x, ' ', y);
-            SDL_GetWindowSize(window, @x, @y);
-            Writeln(x, ' ', y);
+              calculer_coup_couleur(partie,BLANC);
+              Writeln('ez');
             end;
           end;
 
         end;
       end;
     end;
-    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 10);
+    SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255);
     SDL_RenderClear(renderer);
-    AfficherEchiquier(echiquier, renderer);
+    AfficherPartie(partie,renderer);
 
     SDL_RenderPresent(renderer);
+    SDL_Delay(16);
   end;
 
   DestroyTextures;
