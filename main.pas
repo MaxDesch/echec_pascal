@@ -45,6 +45,8 @@ begin
         end;
         SDL_MOUSEBUTTONDOWN :
         begin
+          if event.button.x > SCREEN_HEIGHT then
+            continue;
           x := event.button.x div taille_case;
           y := event.button.y div taille_case;
           Writeln(x,'   ',y);

@@ -17,6 +17,7 @@ const
   DAME = 5;
   ROI = 6;
   VIDE = 0;
+  EN_PASSANT = 100;
 
 Type 
   TPos = record
@@ -28,7 +29,7 @@ Type
     pieceDeplacee: Integer;
     pieceCapturee: Integer;
     promotion: Integer; // Pour les promotions de pions
-    rock: Boolean; // Pour le roque
+    roque: Boolean; // Pour le roque
   end;
 
   TCase = record
@@ -42,8 +43,11 @@ Type
   echiquier : array[0..7, 0..7] of TCase;
   roiblanc_x, roiblanc_y : Integer;
   roinoir_x, roinoir_y : Integer;
-  roque_blanc_possible : Boolean;
-  roque_noir_possible : Boolean;
+  grand_roque_blanc_possible,petit_roque_blanc_possible : Integer;
+  grand_roque_noir_possible,petit_roque_noir_possible : Integer;
+  tour_noir_gauche,tour_noir_droite : TPos;
+  tour_blanc_gauche,tour_blanc_droite : TPos;
+  en_passant_blanc,en_passant_noir :TPos
   end;
 
   TPartie_echec = record
@@ -55,7 +59,7 @@ Type
 
 function InitialiserEchiquier(): Techiquier;
 function EstPositionValide(x, y: Integer): Boolean;
-function CoupsValides(echiquier: Techiquier; x, y: Integer; calcule_echec, check_coup_valable: Boolean): tab_Coup;
+function CoupsValides(echiquier: Techiquier; x, y: Integer; check_coup_valable: Boolean): tab_Coup;
 function is_king_in_check(echiquier: Techiquier; color, kingX, kingY: Integer): Boolean;
 procedure calculer_coup_couleur(var partie:TPartie_echec;couleur:Integer);
 procedure gerer_clique(var partie:TPartie_echec;y,x:Integer);
@@ -118,8 +122,16 @@ begin
   Result.roiblanc_y := 4;
   Result.roinoir_x := 7;
   Result.roinoir_y := 4;
-  Result.roque_blanc_possible := True;
-  Result.roque_noir_possible := True;
+  Result.grand_roque_blanc_possible := 0;
+  Result.grand_roque_noir_possible := 0;
+  Result.petit_roque_blanc_possible := 0;
+  Result.petit_roque_noir_possible := 0;
+  Result.tour_noir_gauche.x := 7; Result.tour_noir_gauche.y := 7;
+  Result.tour_noir_droite.x := 7; Result.tour_noir_droite.y := 0; 
+  Result.tour_blanc_gauche.x := 0; Result.tour_blanc_gauche.y := 7;
+  Result.tour_blanc_droite.x := 0; Result.tour_blanc_droite.y := 0;
+  Result.en_passant_blanc.x := -1; Result.en_passant_blanc.y := 0;
+  Result.en_passant_noir.x := -1; Result.en_passant_noir.y := 0;
 end;
 
 function Initialisation_partie(): TPartie_echec;
@@ -147,12 +159,166 @@ procedure jouer_coup(coup:TCoup;var echiquier:Techiquier);
 begin
   echiquier.echiquier[coup.xArrivee][coup.yArrivee].piece := echiquier.echiquier[coup.xDepart][coup.yDepart].piece;
   echiquier.echiquier[coup.xDepart][coup.yDepart].piece := VIDE;
+  if coup.pieceDeplacee = ROI then
+  begin
+    echiquier.roiblanc_x := coup.xArrivee;
+    echiquier.roiblanc_y := coup.yArrivee;
+    echiquier.grand_roque_blanc_possible += 1;
+    echiquier.petit_roque_blanc_possible += 1;
+  end;
+  if coup.pieceDeplacee = -ROI then
+  begin
+    echiquier.roinoir_x := coup.xArrivee;
+    echiquier.roinoir_y := coup.yArrivee;
+    echiquier.grand_roque_noir_possible += 1;
+    echiquier.petit_roque_noir_possible += 1;
+  end;
+  if coup.pieceDeplacee = TOUR then
+  begin
+    if (coup.xDepart = echiquier.tour_blanc_droite.x) and (coup.yDepart = echiquier.tour_blanc_droite.y) then
+    begin
+      echiquier.tour_blanc_droite.x := coup.xArrivee; echiquier.tour_blanc_droite.y := coup.yArrivee;
+      echiquier.grand_roque_blanc_possible += 1
+    end;
+    if (coup.xDepart = echiquier.tour_blanc_gauche.x) and (coup.yDepart = echiquier.tour_blanc_gauche.y) then
+    begin
+      echiquier.tour_blanc_gauche.x := coup.xArrivee; echiquier.tour_blanc_gauche.y := coup.yArrivee;
+      echiquier.petit_roque_blanc_possible += 1
+    end;
+  end;
+  if coup.pieceDeplacee = -TOUR then
+  begin
+    if (coup.xDepart = echiquier.tour_noir_droite.x) and (coup.yDepart = echiquier.tour_noir_droite.y) then
+    begin
+      echiquier.tour_noir_droite.x := coup.xArrivee; echiquier.tour_noir_droite.y := coup.yArrivee;
+      echiquier.grand_roque_noir_possible += 1
+    end;
+    if (coup.xDepart = echiquier.tour_noir_gauche.x) and (coup.yDepart = echiquier.tour_noir_gauche.y) then
+    begin
+      echiquier.tour_noir_gauche.x := coup.xArrivee; echiquier.tour_noir_gauche.y := coup.yArrivee;
+      echiquier.petit_roque_noir_possible += 1
+    end;
+  end;
+  if coup.roque then 
+  begin
+    if (coup.xArrivee = 7) and (coup.yArrivee = 6) then
+    begin
+      echiquier.echiquier[7,5].piece := echiquier.echiquier[7,7].piece;
+      echiquier.echiquier[7,7].piece := VIDE;
+    end;
+    if (coup.xArrivee = 7) and (coup.yArrivee = 2) then
+    begin
+      echiquier.echiquier[7,3].piece := echiquier.echiquier[7,0].piece;
+      echiquier.echiquier[7,0].piece := VIDE;
+    end;
+    if (coup.xArrivee = 0) and (coup.yArrivee = 6) then
+    begin
+      echiquier.echiquier[0,5].piece := echiquier.echiquier[0,7].piece;
+      echiquier.echiquier[0,7].piece := VIDE;
+    end;
+    if (coup.xArrivee = 0) and (coup.yArrivee = 2) then
+    begin
+      echiquier.echiquier[0,3].piece := echiquier.echiquier[0,0].piece;
+      echiquier.echiquier[0,0].piece := VIDE;
+    end;
+  end;
+  if (coup.pieceDeplacee = PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
+  begin
+    echiquier.en_passant_blanc.x := coup.xArrivee;
+    echiquier.en_passant_blanc.y := coup.yArrivee;
+  end;
+  if (coup.pieceDeplacee = -PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
+  begin
+    echiquier.en_passant_noir.x := coup.xArrivee;
+    echiquier.en_passant_noir.y := coup.yArrivee;
+  end;
+  if coup.pieceCapturee = EN_PASSANT then
+    echiquier.echiquier[coup.xDepart][coup.yArrivee].piece := VIDE;
+  
 end;
 
 procedure dejouer_coup(coup:TCoup;var echiquier:Techiquier);
 begin
   echiquier.echiquier[coup.xDepart][coup.yDepart].piece := echiquier.echiquier[coup.xArrivee][coup.yArrivee].piece;
   echiquier.echiquier[coup.xArrivee][coup.yArrivee].piece := coup.pieceCapturee;
+  if coup.pieceDeplacee = ROI then
+  begin
+    echiquier.roiblanc_x := coup.xDepart;
+    echiquier.roiblanc_y := coup.yDepart;
+    echiquier.grand_roque_blanc_possible -= 1;
+    echiquier.petit_roque_blanc_possible -= 1;
+  end;
+  if coup.pieceDeplacee = -ROI then
+  begin
+    echiquier.roinoir_x := coup.xDepart;
+    echiquier.roinoir_y := coup.yDepart;
+    echiquier.grand_roque_noir_possible -= 1;
+    echiquier.petit_roque_noir_possible -= 1;
+  end;
+  if coup.pieceDeplacee = TOUR then
+  begin
+    if (coup.xArrivee = echiquier.tour_blanc_droite.x) and (coup.yArrivee = echiquier.tour_blanc_droite.y) then
+    begin
+      echiquier.tour_blanc_droite.x := coup.xDepart; echiquier.tour_blanc_droite.y := coup.yDepart;
+      echiquier.grand_roque_blanc_possible -= 1;
+    end;
+    if (coup.xArrivee = echiquier.tour_blanc_gauche.x) and (coup.yArrivee = echiquier.tour_blanc_gauche.y) then
+    begin
+      echiquier.tour_blanc_gauche.x := coup.xDepart; echiquier.tour_blanc_gauche.y := coup.yDepart;
+      echiquier.petit_roque_blanc_possible -= 1;
+    end;
+  end;
+  if coup.pieceDeplacee = -TOUR then
+  begin
+    if (coup.xArrivee = echiquier.tour_noir_droite.x) and (coup.yArrivee = echiquier.tour_noir_droite.y) then
+    begin
+      echiquier.tour_noir_droite.x := coup.xDepart; echiquier.tour_noir_droite.y := coup.yDepart;
+      echiquier.grand_roque_noir_possible -= 1;
+    end;
+    if (coup.xArrivee = echiquier.tour_noir_gauche.x) and (coup.yArrivee = echiquier.tour_noir_gauche.y) then
+    begin
+      echiquier.tour_noir_gauche.x := coup.xDepart; echiquier.tour_noir_gauche.y := coup.yDepart;
+      echiquier.petit_roque_noir_possible -= 1;
+    end;
+  end;
+  if coup.roque then 
+  begin
+    if (coup.xArrivee = 7) and (coup.yArrivee = 6) then
+    begin
+      echiquier.echiquier[7,7].piece := echiquier.echiquier[7,5].piece;
+      echiquier.echiquier[7,5].piece := VIDE;
+    end;
+    if (coup.xArrivee = 7) and (coup.yArrivee = 2) then
+    begin
+      echiquier.echiquier[7,0].piece := echiquier.echiquier[7,3].piece;
+      echiquier.echiquier[7,3].piece := VIDE;
+    end;
+    if (coup.xArrivee = 0) and (coup.yArrivee = 6) then
+    begin
+      echiquier.echiquier[0,7].piece := echiquier.echiquier[0,5].piece;
+      echiquier.echiquier[0,5].piece := VIDE;
+    end;
+    if (coup.xArrivee = 0) and (coup.yArrivee = 2) then
+    begin
+      echiquier.echiquier[0,0].piece := echiquier.echiquier[0,3].piece;
+      echiquier.echiquier[0,3].piece := VIDE;
+    end;
+  end;
+  if (coup.pieceDeplacee = PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
+  begin
+    echiquier.en_passant_blanc.x := -1;
+    echiquier.en_passant_blanc.y := 0;
+  end;
+  if (coup.pieceDeplacee = -PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
+  begin
+    echiquier.en_passant_noir.x := -1;
+    echiquier.en_passant_noir.y := 0;
+  end;
+  if coup.pieceCapturee = EN_PASSANT then
+  begin
+    echiquier.echiquier[coup.xDepart][coup.yArrivee].piece := -coup.pieceDeplacee;
+    echiquier.echiquier[coup.xArrivee][coup.yArrivee].piece := VIDE;
+  end;
 end;
 
 procedure gerer_clique(var partie:TPartie_echec;y,x:Integer);
@@ -202,7 +368,7 @@ begin
   newCoup.pieceDeplacee := pieceDep;
   newCoup.pieceCapturee := pieceCap;
   newCoup.promotion := promo;
-  newCoup.rock := rock;
+  newCoup.roque := rock;
   if check_coup_valable then
   begin
     jouer_coup(newCoup,echiquier);
@@ -250,7 +416,7 @@ begin
     begin
       if (color = BLANC) and (echiquier.echiquier[i, j].piece < 0) then
       begin
-        enemyMoves := CoupsValides(echiquier, i, j, False, False);
+        enemyMoves := CoupsValides(echiquier, i, j, False);
         for move in enemyMoves do
         begin
           if (move.xArrivee = kingX) and (move.yArrivee = kingY) then
@@ -262,7 +428,7 @@ begin
       end
       else if (color = NOIR) and (echiquier.echiquier[i, j].piece > 0) then
       begin
-        enemyMoves := CoupsValides(echiquier, i, j, False, False);
+        enemyMoves := CoupsValides(echiquier, i, j, False);
         for move in enemyMoves do
         begin
           if (move.xArrivee = kingX) and (move.yArrivee = kingY) then
@@ -283,7 +449,7 @@ begin
     Result := Val;
 end;
 
-function CoupsValides(echiquier: Techiquier; x, y: Integer; calcule_echec, check_coup_valable: Boolean): tab_Coup;
+function CoupsValides(echiquier: Techiquier; x, y: Integer; check_coup_valable: Boolean): tab_Coup;
 var 
   i: Integer;
   moves: array of array of Integer;
@@ -308,9 +474,22 @@ begin
         begin
           ajouter_coup(Result, x, y, x + 2, y, PION, VIDE, 0, False, echiquier, check_coup_valable);
         end;
-        if EstPositionValide(x + 1, y + 1) and (echiquier.echiquier[x + 1, y + 1].piece <> VIDE) and (echiquier.echiquier[x + 1, y + 1].piece < 0) then
+        if EstPositionValide(x + 1, y + 1) and (echiquier.echiquier[x + 1, y + 1].piece < 0) then
         begin
           ajouter_coup(Result, x, y, x + 1, y + 1, PION, echiquier.echiquier[x + 1, y + 1].piece, 0, False, echiquier, check_coup_valable);
+        end;
+        if EstPositionValide(x + 1, y - 1) and (echiquier.echiquier[x + 1, y - 1].piece < 0) then
+        begin
+          ajouter_coup(Result, x, y, x + 1, y - 1, PION, echiquier.echiquier[x + 1, y - 1].piece, 0, False, echiquier, check_coup_valable);
+        end;
+        // en passant
+        if (x = echiquier.en_passant_noir.x) and  (y + 1 = echiquier.en_passant_noir.y) then
+        begin
+          ajouter_coup(Result, x, y, x + 1, y + 1, PION, EN_PASSANT, 0, False, echiquier, check_coup_valable);
+        end;
+        if (x = echiquier.en_passant_noir.x) and  (y - 1 = echiquier.en_passant_noir.y) then
+        begin
+          ajouter_coup(Result, x, y, x + 1, y - 1, PION, EN_PASSANT, 0, False, echiquier, check_coup_valable);
         end;
       end
       else
@@ -325,9 +504,21 @@ begin
         begin
           ajouter_coup(Result, x, y, x - 2, y, -PION, VIDE, 0, False, echiquier, check_coup_valable);
         end;
-        if EstPositionValide(x - 1, y - 1) and (echiquier.echiquier[x - 1, y - 1].piece <> VIDE) and (echiquier.echiquier[x - 1, y - 1].piece > 0) then
+        if EstPositionValide(x - 1, y - 1) and (echiquier.echiquier[x - 1, y - 1].piece > 0) then
         begin
           ajouter_coup(Result, x, y, x - 1, y - 1, -PION, echiquier.echiquier[x - 1, y - 1].piece, 0, False, echiquier, check_coup_valable);
+        end;
+        if EstPositionValide(x - 1, y + 1) and (echiquier.echiquier[x - 1, y + 1].piece > 0) then
+        begin
+          ajouter_coup(Result, x, y, x - 1, y + 1, -PION, echiquier.echiquier[x - 1, y + 1].piece, 0, False, echiquier, check_coup_valable);
+        end;
+        if (x = echiquier.en_passant_noir.x) and  (y + 1 = echiquier.en_passant_noir.y) then
+        begin
+          ajouter_coup(Result, x, y, x - 1, y + 1, -PION, EN_PASSANT, 0, False, echiquier, check_coup_valable);
+        end;
+        if (x = echiquier.en_passant_noir.x) and  (y - 1 = echiquier.en_passant_noir.y) then
+        begin
+          ajouter_coup(Result, x, y, x - 1, y - 1, -PION, EN_PASSANT, 0, False, echiquier, check_coup_valable);
         end;
       end
     end;
@@ -339,7 +530,7 @@ begin
       check_direction(echiquier, x, y, 0, 1, Result, check_coup_valable); // Vers la droite
       check_direction(echiquier, x, y, 0, -1, Result, check_coup_valable); // Vers la gauche
     end;
-    (FOU or -FOU): begin
+    FOU : begin
       // Logique des coups valides pour le fou
       check_direction(echiquier, x, y, 1, 1, Result, check_coup_valable); // Diagonale bas-droite
       check_direction(echiquier, x, y, 1, -1, Result, check_coup_valable); // Diagonale bas-gauche
@@ -375,20 +566,28 @@ begin
     end;
     ROI: 
     begin
-      if calcule_echec then
-        Exit;
       // Logique des coups valides pour le roi
       moves := [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
       for i := 0 to 7 do
       begin
         newX := x + moves[i, 0];
         newY := y + moves[i, 1];
-        if EstPositionValide(newX, newY) then
-          if (echiquier.echiquier[newX, newY].piece = VIDE) or ((echiquier.echiquier[x, y].piece > 0) and (echiquier.echiquier[newX, newY].piece < 0)) or ((echiquier.echiquier[x, y].piece < 0) and (echiquier.echiquier[newX, newY].piece > 0)) then
-            begin
+        if EstPositionValide(newX, newY) and ((echiquier.echiquier[newX, newY].piece = VIDE) or (Couleur_piece(echiquier.echiquier[x, y].piece) <> Couleur_piece(echiquier.echiquier[newX, newY].piece))) then
               ajouter_coup(Result, x, y, newX, newY, echiquier.echiquier[x, y].piece, echiquier.echiquier[newX, newY].piece, 0, False, echiquier, check_coup_valable);
-            end;
-        
+      end;
+      if echiquier.echiquier[x, y].piece = ROI then
+      begin
+        if (echiquier.petit_roque_blanc_possible = 0) and (echiquier.echiquier[0, 5].piece = VIDE) and (echiquier.echiquier[0, 6].piece = VIDE) then 
+          ajouter_coup(Result, x, y, 0, 6, echiquier.echiquier[x, y].piece, VIDE, 0, True, echiquier, check_coup_valable);
+        if (echiquier.grand_roque_blanc_possible = 0) and (echiquier.echiquier[0, 3].piece = VIDE) and (echiquier.echiquier[0, 2].piece = VIDE) and (echiquier.echiquier[0, 1].piece = VIDE) then
+          ajouter_coup(Result, x, y, 0, 2, echiquier.echiquier[x, y].piece, VIDE, 0, True, echiquier, check_coup_valable);
+      end
+      else
+      begin
+        if (echiquier.petit_roque_noir_possible = 0) and (echiquier.echiquier[7, 5].piece = VIDE) and (echiquier.echiquier[7, 6].piece = VIDE) then 
+          ajouter_coup(Result, x, y, 7, 6, echiquier.echiquier[x, y].piece, VIDE, 0, True, echiquier, check_coup_valable);
+        if (echiquier.grand_roque_noir_possible = 0) and (echiquier.echiquier[7, 3].piece = VIDE) and (echiquier.echiquier[7, 2].piece = VIDE) and (echiquier.echiquier[7, 1].piece = VIDE) then
+          ajouter_coup(Result, x, y, 7, 2, echiquier.echiquier[x, y].piece, VIDE, 0, True, echiquier, check_coup_valable);
       end;
     end;
   end;
@@ -401,11 +600,10 @@ begin
     begin
       if Couleur_piece(partie.echiquier.echiquier[i][j].piece) = couleur then
       begin
-        partie.echiquier.echiquier[i][j].coups_autoriser := CoupsValides(partie.echiquier, i, j, True, True);
+        partie.echiquier.echiquier[i][j].coups_autoriser := CoupsValides(partie.echiquier, i, j, True);
         Writeln('nb coup pos (',i,' ',j,'): ',Length(partie.echiquier.echiquier[i][j].coups_autoriser));
       end;
     end;
 end;
-
 
 end.
