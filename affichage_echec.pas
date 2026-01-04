@@ -7,13 +7,15 @@ uses
   Classes, SysUtils, SDL2 in 'SDL2-Pascal/units/sdl2.pas',SDL2_image in 'SDL2-Pascal/units/sdl2_image.pas',
   SDL2_ttf in 'SDL2-Pascal/units/sdl2_ttf.pas',
   SDL2_gfx in 'SDL2-Pascal/units/sdl2_gfx.pas',
-  echec_utilitaire;
+  echec_utilitaire,
+  affichage_class;
 procedure AfficherEchiquier(echiquier: Techiquier; renderer: PSDL_Renderer);
 procedure AfficherPiece(echiquier: Techiquier; x, y: Integer; rect: TSDL_Rect; renderer: PSDL_Renderer);
 procedure InitialiserTextures(renderer: PSDL_Renderer);
 procedure DestroyTextures;
 procedure InitialiserSDL;
 procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
+procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
 
 var
   texture_piece: array[-ROI..ROI] of PSDL_Texture;
@@ -29,15 +31,17 @@ var
   actual_screen_width : Integer = 1600;
   actual_screen_heigt : Integer = 900;
   
+  
 
 const
-  SCREEN_WIDTH = 1600 * 8;
-  SCREEN_HEIGHT = 900 * 8;
+  SCREEN_WIDTH = 640 ;
+  SCREEN_HEIGHT = 360 ;
   taille_case = SCREEN_HEIGHT div 8;
 
 implementation
 
 procedure InitialiserSDL;
+var icon : PSDL_Surface;
 begin
   if SDL_Init(SDL_INIT_VIDEO) <> 0 then
   begin
@@ -71,7 +75,7 @@ begin
     Halt(1);
   end;
 
-  font := TTF_OpenFont('C:/Windows/Fonts/arial.ttf', 50);
+  font := TTF_OpenFont('font/gau_font_cube/GAU_cube_B.TTF', 10);
   if font = nil then
   begin
     Writeln('Could not load font: ', TTF_GetError);
@@ -80,6 +84,10 @@ begin
     SDL_Quit;
     Halt(1);
   end;
+
+  icon := IMG_Load('image/pouce_en_air.png');
+  SDL_SetWindowIcon(window,icon);
+  SDL_FreeSurface(icon);
 end;
 
 procedure InitialiserTextures(renderer: PSDL_Renderer);
@@ -235,7 +243,7 @@ begin
     begin
       if partie.echiquier.echiquier[i][j].piece = VIDE then
         continue;
-      if couleur_affichage = BLANC then
+      if partie.couleur_affichage = BLANC then
       begin
         rect.x := (7 - j) * taille_case;
         rect.y := (7 - i) * taille_case;
@@ -255,6 +263,51 @@ begin
   AfficherCase(renderer);
   AfficherAllPoint(partie,renderer);
   AfficherAllPiece(partie,renderer);
+  AfficherInformation(partie,renderer);
+end;
+
+function string_temp(temp:Integer):string;
+begin
+  if temp > 100 then
+  begin
+    if ((temp div 10) mod 60) < 10 then 
+      Result := IntToStr((temp div 10) div 60) + ':' + IntToStr(0) + IntToStr((temp div 10) mod 60)
+    else
+      Result := IntToStr((temp div 10) div 60) + ':' + IntToStr((temp div 10) mod 60);
+  end
+  else 
+    Result := IntToStr(temp div 10) + ',' + IntToStr(temp mod 10)
+end;
+
+procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
+var rect_text : TSDL_Rect;
+  surf : PSDL_Surface;
+  texture : PSDL_Texture;
+  text : string;
+begin
+  text := string_temp(partie.timer_blanc);
+  rect_text.x := SCREEN_HEIGHT + 30 + (5-Length(text))*17;
+  rect_text.y := 30;
+  rect_text.w := 70 - (5-Length(text))*17;
+  rect_text.h := 25;
+  
+  surf := TTF_RenderText_Solid(font, PChar(text), RGB(255,255,255));
+  texture := SDL_CreateTextureFromSurface(renderer, surf);
+  SDL_RenderCopy(renderer, texture, nil, @rect_text);
+  SDL_DestroyTexture(texture);
+  SDL_FreeSurface(surf);
+
+  text := string_temp(partie.timer_noir);
+  rect_text.x := SCREEN_HEIGHT + 170 + (5-Length(text))*17;
+  rect_text.y := 30;
+  rect_text.w := 70 - (5-Length(text))*17;
+  rect_text.h := 25;
+
+  surf := TTF_RenderText_Solid(font, PChar(text), RGB(0,0,0));
+  texture := SDL_CreateTextureFromSurface(renderer, surf);
+  SDL_RenderCopy(renderer, texture, nil, @rect_text);
+  SDL_DestroyTexture(texture);
+  SDL_FreeSurface(surf);
 end;
 
 end.

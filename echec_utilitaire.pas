@@ -18,6 +18,7 @@ const
   ROI = 6;
   VIDE = 0;
   EN_PASSANT = 100;
+	DRAW = 10;
 
 Type 
   TPos = record
@@ -55,6 +56,10 @@ Type
   piece_selectione : TPos ;
   couleur_affichage : Integer ;
   couleur_joueur : Integer ;
+	timer_blanc : Integer ;
+	timer_noir : Integer ;
+	gagnant : Integer ;
+	timer_on, cliquable : Boolean; 
   end;
 
 function InitialiserEchiquier(): Techiquier;
@@ -64,6 +69,9 @@ function is_king_in_check(echiquier: Techiquier; color, kingX, kingY: Integer): 
 procedure calculer_coup_couleur(var partie:TPartie_echec;couleur:Integer);
 procedure gerer_clique(var partie:TPartie_echec;y,x:Integer);
 function Initialisation_partie(): TPartie_echec;
+procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec);
+procedure finir_partie(var partie:TPartie_echec;gagnant:Integer);
+procedure diminuer_timer(var partie:TPartie_echec);
 
 implementation
 
@@ -137,10 +145,15 @@ end;
 function Initialisation_partie(): TPartie_echec;
 begin
   Result.echiquier := InitialiserEchiquier;
-  Result.piece_selectione.x := -1;
-  Result.piece_selectione.y := 0;
+  Result.piece_selectione.x := -1 ;
+  Result.piece_selectione.y := 0 ;
   Result.couleur_affichage := BLANC ;
   Result.couleur_joueur := BLANC ;
+	Result.timer_blanc := 30*1 ;
+	Result.timer_noir := 30*600 ;
+	Result.gagnant := VIDE ;
+	Result.timer_on := True; Result.cliquable := True;
+	calculer_coup_couleur(Result,Result.couleur_joueur);
 end;
 
 function EstPositionValide(x, y: Integer): Boolean;
@@ -151,8 +164,11 @@ end;
 function Couleur_piece(piece:Integer):Integer;
 begin
   if piece > 0 then
-    Result := blanc
-  else Result := noir;
+    Result := BLANC
+  else if piece = VIDE then
+		Result := VIDE
+	else
+		Result := NOIR;
 end;
 
 procedure jouer_coup(coup:TCoup;var echiquier:Techiquier);
@@ -226,12 +242,16 @@ begin
   begin
     echiquier.en_passant_blanc.x := coup.xArrivee;
     echiquier.en_passant_blanc.y := coup.yArrivee;
-  end;
+  end
+  else
+    echiquier.en_passant_blanc.x := -1;
   if (coup.pieceDeplacee = -PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
   begin
     echiquier.en_passant_noir.x := coup.xArrivee;
     echiquier.en_passant_noir.y := coup.yArrivee;
-  end;
+  end
+  else
+    echiquier.en_passant_noir.x := -1 ;
   if coup.pieceCapturee = EN_PASSANT then
     echiquier.echiquier[coup.xDepart][coup.yArrivee].piece := VIDE;
   
@@ -305,15 +325,11 @@ begin
     end;
   end;
   if (coup.pieceDeplacee = PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
-  begin
     echiquier.en_passant_blanc.x := -1;
-    echiquier.en_passant_blanc.y := 0;
-  end;
+  
   if (coup.pieceDeplacee = -PION) and (abs(coup.xArrivee - coup.xDepart) = 2) then
-  begin
     echiquier.en_passant_noir.x := -1;
-    echiquier.en_passant_noir.y := 0;
-  end;
+  
   if coup.pieceCapturee = EN_PASSANT then
   begin
     echiquier.echiquier[coup.xDepart][coup.yArrivee].piece := -coup.pieceDeplacee;
@@ -321,9 +337,29 @@ begin
   end;
 end;
 
+procedure diminuer_timer(var partie:TPartie_echec);
+begin
+	if not partie.timer_on then
+		Exit;
+	if partie.couleur_joueur = BLANC then
+	begin
+		partie.timer_blanc -= 1;
+		if partie.timer_blanc = 0 then
+			finir_partie(partie,NOIR);
+	end
+	else
+	begin
+		partie.timer_noir -= 1;
+		if partie.timer_noir = 0 then
+				finir_partie(partie,BLANC);
+	end;
+end;
+
 procedure gerer_clique(var partie:TPartie_echec;y,x:Integer);
 var piece, i : Integer; tab_coup : array of TCoup; 
 begin
+	if not partie.cliquable then 
+		Exit;
   if EstPositionValide(x,y) then
   if partie.couleur_affichage = BLANC then
     begin
@@ -349,7 +385,7 @@ begin
       for i := 0 to Length(tab_coup) - 1 do
       begin
         if (x = tab_coup[i].xArrivee) and (y = tab_coup[i].yArrivee) then
-          jouer_coup(tab_coup[i],partie.echiquier)
+          jouer_coup_definitivement(tab_coup[i],partie)
       end;
     end;
   end;
@@ -592,18 +628,32 @@ begin
     end;
   end;
 end;
+
 procedure calculer_coup_couleur(var partie:TPartie_echec;couleur:Integer);
 var i,j:Integer;
 begin
   for i := 0 to 7 do
     for j := 0 to 7 do
     begin
-      if Couleur_piece(partie.echiquier.echiquier[i][j].piece) = couleur then
+    	if Couleur_piece(partie.echiquier.echiquier[i][j].piece) = couleur then
       begin
         partie.echiquier.echiquier[i][j].coups_autoriser := CoupsValides(partie.echiquier, i, j, True);
-        Writeln('nb coup pos (',i,' ',j,'): ',Length(partie.echiquier.echiquier[i][j].coups_autoriser));
       end;
     end;
+end;
+
+procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec);
+begin
+	jouer_coup(coup,partie.echiquier);
+	partie.couleur_joueur := -partie.couleur_joueur;
+	calculer_coup_couleur(partie,partie.couleur_joueur);
+end;
+
+procedure finir_partie(var partie:TPartie_echec;gagnant:Integer);
+begin
+	partie.gagnant := gagnant ;
+	partie.cliquable := False ;
+	partie.timer_on := False ;
 end;
 
 end.
