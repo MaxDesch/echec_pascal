@@ -1,5 +1,7 @@
 unit affichage_class;
 {$mode objfpc}{$H+}
+
+// fichier de toute mes class gérant l'Affichage plus facilement ez
 interface
 
 uses
@@ -27,6 +29,8 @@ type
     procedure SetHovered(AHovered: Boolean);
     procedure Draw(ARenderer: PSDL_Renderer);
   end;
+
+
   TAffichageScrollable = class
   private
     FEcart : Integer;
@@ -35,18 +39,44 @@ type
     FSurfaceReel : PSDL_Surface;
     FTextureReel : PSDL_Texture;
     FListeSurface : array of PSDL_Surface;
+    drag : Boolean;
     procedure AjusterScrollBar;
   public
     constructor Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
     procedure Draw(ARenderer: PSDL_Renderer);
     procedure Ajouter_Surface(surface: PSDL_Surface; renderer: PSDL_Renderer);
     procedure detruire;
-    procedure Scroll(dir:Integer);
+    procedure Scroll(dir:Integer; dx,dy : Real);
+    procedure gerer_clique(x,y:Integer; dx,dy: Real);
+    procedure gerer_declique;
+    procedure gerer_motion(y : Integer);
   end;
+
+  PAffichageScrollable = ^TAffichageScrollable ;
+  PReal = ^Real;
+
+  TGestionnaireTAffichageScrollable = class
+  private
+    tab_Affichage : array of PAffichageScrollable;
+    dx,dy : PReal;
+    utilisedxdy : Boolean;
+  public
+    constructor Create;
+    procedure Definir_Scalaire(x,y : PReal);
+    procedure Ajout_Affichage(affichache : PAffichageScrollable);
+    procedure Scroll(dir:Integer);
+    procedure Draw(ARenderer: PSDL_Renderer);
+    procedure gerer_clique;
+    procedure gerer_declique;
+    procedure gerer_motion(y : Integer);
+    procedure detruire;
+  end;
+
+
 function RGB(r, g, b: Byte): TSDL_Color;
 function RGBA(r, g, b, a: Byte): TSDL_Color;
 function Min(a, b: Byte): Byte;
-function PointInRect(px, py: Integer; const R: TSDL_Rect): Boolean;
+function PointInRect(px, py: Integer; R: TSDL_Rect): Boolean;
 
 
 implementation
@@ -77,9 +107,14 @@ begin
   Result.a := a;
 end;
 
-function PointInRect(px, py: Integer; const R: TSDL_Rect): Boolean;
+function PointInRect(px, py: Integer; R: TSDL_Rect): Boolean;
 begin
   Result := (px >= R.x) and (px < R.x + R.w) and (py >= R.y) and (py < R.y + R.h);
+end;
+
+function PointInRectScalaire(px, py: Integer; dx, dy : Real; R: TSDL_Rect): Boolean;
+begin
+  Result := (px * dx >= R.x ) and (px * dx < R.x + R.w) and (py * dy >= R.y) and (py * dy < R.y + R.h);
 end;
 
 function ExtendSurface(
@@ -228,6 +263,7 @@ begin
   FRectBG.h := AHeight;
   FSurfaceReel := SDL_CreateRGBSurface(0, AWidth, 1, 32, $000000FF, $0000FF00, $00FF0000, $FF000000);
   FListeSurface := []; 
+  drag := False;
 end;
 procedure TAffichageScrollable.Draw(ARenderer:PSDL_Renderer);
 begin
@@ -269,13 +305,11 @@ begin
   WriteLn(FRectSrollBar.h, '    ', FSurfaceReel^.h);
 end;
 
-procedure TAffichageScrollable.Scroll(dir:Integer);
+procedure TAffichageScrollable.Scroll(dir:Integer; dx,dy : Real);
 var x,y :Integer;
 begin
   SDL_GetMouseState(@x,@y);
-  WriteLn(x, '  ', y);
-  if not PointInRect(x,y,FRectBG) then Exit;
-  WriteLn('ez');
+  if not PointInRectScalaire(x,y,dx,dy,FRectBG) then Exit;
   FRectTextureToAffichage.y += -dir * 10;
   if FRectTextureToAffichage.y > (FSurfaceReel^.h - FRectBG.h) then
     FRectTextureToAffichage.y := FSurfaceReel^.h - FRectBG.h;
@@ -285,6 +319,32 @@ begin
   
 end;
 
+procedure TAffichageScrollable.gerer_clique(x,y:Integer; dx,dy: Real);
+begin
+  if not PointInRectScalaire(x,y,dx,dy,FRectSrollBar) then 
+  begin
+    drag := False;
+    Exit;
+  end;
+  drag := True;
+end;
+procedure TAffichageScrollable.gerer_declique;
+begin
+  drag := False;
+end;
+
+procedure TAffichageScrollable.gerer_motion(y : Integer);
+begin
+  if not drag then Exit;
+  FRectTextureToAffichage.y += Ceil(y  * FSurfaceReel^.h/FRectBG.h);
+  if FRectTextureToAffichage.y > (FSurfaceReel^.h - FRectBG.h) then
+    FRectTextureToAffichage.y := FSurfaceReel^.h - FRectBG.h;
+  if FRectTextureToAffichage.y < 0 then
+    FRectTextureToAffichage.y := 0;
+  self.AjusterScrollBar;
+end;
+
+
 procedure TAffichageScrollable.detruire;
 var i : Integer;
 begin
@@ -293,4 +353,75 @@ begin
   for i := 0 to Length(FListeSurface) -1 do
     SDL_FreeSurface(FListeSurface[i]);
 end;
+
+
+
+// TGestionnaireTAffichageScrollable definition
+constructor TGestionnaireTAffichageScrollable.Create();
+begin
+  utilisedxdy := False;
+  tab_Affichage := [];
+end;
+
+procedure TGestionnaireTAffichageScrollable.Definir_Scalaire(x,y : PReal);
+begin
+  dx := x;
+  dy := y;
+  utilisedxdy := True;
+end;
+procedure TGestionnaireTAffichageScrollable.Ajout_Affichage(affichache : PAffichageScrollable);
+begin
+  SetLength(tab_Affichage,Length(tab_Affichage)+1);
+  tab_Affichage[Length(tab_Affichage)-1] := affichache;
+end;
+
+procedure TGestionnaireTAffichageScrollable.Scroll(dir:Integer);
+var i : Integer; 
+begin
+  if utilisedxdy then
+  begin
+    for i := 0 to Length(tab_Affichage)-1 do
+      tab_Affichage[i]^.Scroll(dir,dx^,dy^);
+  Exit;
+  end;
+
+  for i := 0 to Length(tab_Affichage)-1 do
+    tab_Affichage[i]^.Scroll(dir,1,1);
+end;
+
+
+procedure TGestionnaireTAffichageScrollable.Draw(ARenderer:PSDL_Renderer);
+var i : Integer; 
+begin
+  for i := 0 to Length(tab_Affichage)-1 do
+    tab_Affichage[i]^.Draw(ARenderer);
+end;
+
+procedure TGestionnaireTAffichageScrollable.gerer_clique;
+var i, x, y : Integer; 
+begin
+  SDL_GetMouseState(@x,@y);
+  for i := 0 to Length(tab_Affichage)-1 do
+    tab_Affichage[i]^.gerer_clique(x,y,dx^,dy^);
+end;
+procedure TGestionnaireTAffichageScrollable.gerer_declique;
+var i : Integer; 
+begin
+  for i := 0 to Length(tab_Affichage)-1 do
+    tab_Affichage[i]^.gerer_declique;
+end;
+procedure TGestionnaireTAffichageScrollable.gerer_motion(y : Integer);
+var i : Integer; 
+begin
+  for i := 0 to Length(tab_Affichage)-1 do
+    tab_Affichage[i]^.gerer_motion(y);
+end;
+
+procedure TGestionnaireTAffichageScrollable.detruire;
+var i : Integer; 
+begin
+  for i := 0 to Length(tab_Affichage)-1 do
+    tab_Affichage[i]^.detruire;
+end;
+
 end.

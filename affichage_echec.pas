@@ -17,6 +17,12 @@ procedure InitialiserSDL;
 procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
 procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
 
+
+const
+  SCREEN_WIDTH = 640 ;
+  SCREEN_HEIGHT = 360 ;
+  taille_case = SCREEN_HEIGHT div 8;
+
 var
   texture_piece: array[-ROI..ROI] of PSDL_Texture;
   point_deplacement : PSDL_Texture;
@@ -29,15 +35,11 @@ var
   font : PTTF_Font;
   couleur_affichage : Integer;
   actual_screen_width : Integer = 1600;
-  actual_screen_heigt : Integer = 900;
+  actual_screen_heigth : Integer = 900;
+  ratioscreen_x : Real ;
+  ratioscreen_y : Real ;
   
   
-
-const
-  SCREEN_WIDTH = 640 ;
-  SCREEN_HEIGHT = 360 ;
-  taille_case = SCREEN_HEIGHT div 8;
-
 implementation
 
 procedure InitialiserSDL;
@@ -50,7 +52,7 @@ begin
   end;
 
   // Your game code would go here
-  window := SDL_CreateWindow('Echecs Pascal', SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, actual_screen_width, actual_screen_heigt, SDL_WINDOW_SHOWN);
+  window := SDL_CreateWindow('Echecs Pascal', SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, actual_screen_width, actual_screen_heigth, SDL_WINDOW_SHOWN);
   if window = nil then
   begin
     Writeln('Could not create window: ', SDL_GetError);

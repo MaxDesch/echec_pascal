@@ -149,7 +149,7 @@ begin
   Result.piece_selectione.y := 0 ;
   Result.couleur_affichage := BLANC ;
   Result.couleur_joueur := BLANC ;
-	Result.timer_blanc := 30*1 ;
+	Result.timer_blanc := 30*600 ;
 	Result.timer_noir := 30*600 ;
 	Result.gagnant := VIDE ;
 	Result.timer_on := True; Result.cliquable := True;
@@ -485,7 +485,7 @@ begin
     Result := Val;
 end;
 
-function CoupsValides(echiquier: Techiquier; x, y: Integer; check_coup_valable: Boolean): tab_Coup;
+function CoupsValides(echiquier: Techiquier; x, y: Integer; check_coup_valable: Boolean): tab_Coup; // la Tibs
 var 
   i: Integer;
   moves: array of array of Integer;
