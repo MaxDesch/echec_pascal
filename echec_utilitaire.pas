@@ -5,7 +5,9 @@ Unit echec_utilitaire;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, affichage_class, 
+  SDL2 in 'SDL2-Pascal/units/sdl2.pas',
+  SDL2_ttf in 'SDL2-Pascal/units/sdl2_ttf.pas';
 
 const
   BLANC = 1;
@@ -22,7 +24,7 @@ const
 
 Type 
   TPos = record
-  x,y:Integer
+    x,y:Integer;
   end;
   TCoup = record
     xDepart, yDepart: Integer;
@@ -34,32 +36,35 @@ Type
   end;
 
   TCase = record
-  piece : Integer;
-  coups_autoriser : array of TCoup;
+    piece : Integer;
+    coups_autoriser : array of TCoup;
   end;
 
   tab_Coup = array of TCoup; 
 
   Techiquier = record
-  echiquier : array[0..7, 0..7] of TCase;
-  roiblanc_x, roiblanc_y : Integer;
-  roinoir_x, roinoir_y : Integer;
-  grand_roque_blanc_possible,petit_roque_blanc_possible : Integer;
-  grand_roque_noir_possible,petit_roque_noir_possible : Integer;
-  tour_noir_gauche,tour_noir_droite : TPos;
-  tour_blanc_gauche,tour_blanc_droite : TPos;
-  en_passant_blanc,en_passant_noir :TPos
+    echiquier : array[0..7, 0..7] of TCase;
+    roiblanc_x, roiblanc_y : Integer;
+    roinoir_x, roinoir_y : Integer;
+    grand_roque_blanc_possible,petit_roque_blanc_possible : Integer;
+    grand_roque_noir_possible,petit_roque_noir_possible : Integer;
+    tour_noir_gauche,tour_noir_droite : TPos;
+    tour_blanc_gauche,tour_blanc_droite : TPos;
+    en_passant_blanc,en_passant_noir :TPos
   end;
 
   TPartie_echec = record
-  echiquier : Techiquier ;
-  piece_selectione : TPos ;
-  couleur_affichage : Integer ;
-  couleur_joueur : Integer ;
-	timer_blanc : Integer ;
-	timer_noir : Integer ;
-	gagnant : Integer ;
-	timer_on, cliquable : Boolean; 
+    echiquier : Techiquier ;
+    piece_selectione : TPos ;
+    couleur_affichage : Integer ;
+    couleur_joueur : Integer ;
+    timer_blanc : Integer ;
+    timer_noir : Integer ;
+    gagnant : Integer ;
+    timer_on, cliquable : Boolean; 
+    affichage_coup_blanc,affichage_coup_noir : TAffichageScrollable;
+    gestionaire : TGestionnaireTAffichageScrollable;
+    font : PTTF_Font;
   end;
 
 function InitialiserEchiquier(): Techiquier;
@@ -67,9 +72,9 @@ function EstPositionValide(x, y: Integer): Boolean;
 function CoupsValides(echiquier: Techiquier; x, y: Integer; check_coup_valable: Boolean): tab_Coup;
 function is_king_in_check(echiquier: Techiquier; color, kingX, kingY: Integer): Boolean;
 procedure calculer_coup_couleur(var partie:TPartie_echec;couleur:Integer);
-procedure gerer_clique(var partie:TPartie_echec;y,x:Integer);
+procedure gerer_clique(var partie:TPartie_echec;y,x:Integer;renderer : PSDL_Renderer);
 function Initialisation_partie(): TPartie_echec;
-procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec);
+procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec; renderer : PSDL_Renderer);
 procedure finir_partie(var partie:TPartie_echec;gagnant:Integer);
 procedure diminuer_timer(var partie:TPartie_echec);
 
@@ -154,6 +159,12 @@ begin
 	Result.gagnant := VIDE ;
 	Result.timer_on := True; Result.cliquable := True;
 	calculer_coup_couleur(Result,Result.couleur_joueur);
+  Result.affichage_coup_blanc := TAffichageScrollable.Create(375, 60, 100, 200, 5, RGB(0,0,0));
+  Result.affichage_coup_noir := TAffichageScrollable.Create(520, 60, 100, 200, 5, RGB(0,0,0));
+  Result.gestionaire := TGestionnaireTAffichageScrollable.Create;
+  Result.gestionaire.Ajout_Affichage(@Result.affichage_coup_blanc);
+  Result.gestionaire.Ajout_Affichage(@Result.affichage_coup_noir);
+  Result.font := TTF_OpenFont('font/gau_font_cube/GAU_cube_B.TTF', 13);
 end;
 
 function EstPositionValide(x, y: Integer): Boolean;
@@ -355,7 +366,7 @@ begin
 	end;
 end;
 
-procedure gerer_clique(var partie:TPartie_echec;y,x:Integer);
+procedure gerer_clique(var partie:TPartie_echec;y,x:Integer; renderer : PSDL_Renderer);
 var piece, i : Integer; tab_coup : array of TCoup; 
 begin
 	if not partie.cliquable then 
@@ -385,7 +396,7 @@ begin
       for i := 0 to Length(tab_coup) - 1 do
       begin
         if (x = tab_coup[i].xArrivee) and (y = tab_coup[i].yArrivee) then
-          jouer_coup_definitivement(tab_coup[i],partie)
+          jouer_coup_definitivement(tab_coup[i],partie, renderer)
       end;
     end;
   end;
@@ -642,9 +653,36 @@ begin
     end;
 end;
 
-procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec);
+function piece_to_lettre(piece:Integer): String;
+begin
+  case abs(piece) of
+    PION : Result := '';
+    TOUR : Result := 'r';
+    FOU : Result := 'b';
+    CAVALIER : Result := 'c';
+    DAME : Result := 'q';
+    ROI : Result := 'k';
+  end;
+end;
+
+function Coup_to_string(coup:TCoup):String;
+begin
+  Result := '';
+  Result += piece_to_lettre(coup.pieceDeplacee) + Char(97 + 7 - coup.yDepart) + IntToStr(coup.xDepart + 1) + '->' + Char(97 + 7 - coup.yArrivee) + IntToStr(coup.xArrivee + 1);
+  WriteLn('ahaha');
+  if coup.pieceCapturee <> VIDE then 
+    Result += ' x'
+end;
+
+procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec;renderer : PSDL_Renderer);
 begin
 	jouer_coup(coup,partie.echiquier);
+  WriteLn('ez doi');
+  if partie.couleur_joueur = BLANC then
+    partie.affichage_coup_blanc.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer)
+  else
+    partie.affichage_coup_noir.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer);
+  WriteLn('ez doi');
 	partie.couleur_joueur := -partie.couleur_joueur;
 	calculer_coup_couleur(partie,partie.couleur_joueur);
 end;

@@ -26,8 +26,6 @@ var
   running: Boolean;
   x,y : Integer;
   timerID :TSDL_TimerID;
-  affichagescrollable : TAffichageScrollable;
-  gestionaire : TGestionnaireTAffichageScrollable;
 
 function TimerCallback(interval: UInt32; param: Pointer): UInt32; cdecl;
 var
@@ -56,11 +54,7 @@ begin
   ratioscreen_x :=  SCREEN_WIDTH / actual_screen_width;
   ratioscreen_y :=  SCREEN_HEIGHT / actual_screen_heigth;
 
-
-  affichagescrollable := TAffichageScrollable.Create(390, 60, 100, 200, 5, RGB(0,0,0));
-  gestionaire := TGestionnaireTAffichageScrollable.Create;
-  gestionaire.Definir_Scalaire(@ratioscreen_x,@ratioscreen_y);
-  gestionaire.Ajout_Affichage(@affichagescrollable);
+  partie.gestionaire.Definir_Scalaire(@ratioscreen_x,@ratioscreen_y);
   running := True;
 
   while running do
@@ -73,24 +67,24 @@ begin
         SDL_QUITEV: running := False;
         SDL_MOUSEMOTION: 
         begin
-          gestionaire.gerer_motion(event.motion.yrel);
+          partie.gestionaire.gerer_motion(event.motion.yrel);
         end;
         SDL_MOUSEWHEEL :
         begin
-        gestionaire.Scroll(event.wheel.y);
+        partie.gestionaire.Scroll(event.wheel.y);
         end;
         SDL_MOUSEBUTTONDOWN :
         begin
-          gestionaire.gerer_clique;
+          partie.gestionaire.gerer_clique;
           if event.button.x > SCREEN_HEIGHT then
             continue;
           x := event.button.x div taille_case;
           y := event.button.y div taille_case;
-          gerer_clique(partie,x,y);
+          gerer_clique(partie, x, y, renderer);
         end;
         SDL_MOUSEBUTTONUP:
         begin
-          gestionaire.gerer_declique;
+          partie.gestionaire.gerer_declique;
         end;
         SDL_KEYDOWN: 
         begin
@@ -103,7 +97,8 @@ begin
             end;
             SDLK_w:
             begin
-              affichagescrollable.Ajouter_Surface(TTF_RenderText_Solid(font, 'ez', RGB(255,255,255)),renderer);
+              WriteLn(Ord('a'));
+              //affichagescrollable.Ajouter_Surface(TTF_RenderText_Solid(font, 'ez', RGB(255,255,255)),renderer);
             end;
           end;
         end;
@@ -118,8 +113,6 @@ begin
     SDL_RenderClear(renderer);
     AfficherPartie(partie,renderer);
 
-    gestionaire.Draw(renderer);
-
     SDL_RenderPresent(renderer);
     SDL_Delay(16);
   end;
@@ -127,6 +120,6 @@ begin
     SDL_RemoveTimer(timerID);
   DestroyTextures;
   TTF_CloseFont(font);
-  gestionaire.detruire;
+  partie.gestionaire.detruire;
   SDL_Quit;
 end.

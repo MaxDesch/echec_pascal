@@ -266,6 +266,7 @@ begin
   AfficherAllPoint(partie,renderer);
   AfficherAllPiece(partie,renderer);
   AfficherInformation(partie,renderer);
+  partie.gestionaire.Draw(renderer);
 end;
 
 function string_temp(temp:Integer):string;
