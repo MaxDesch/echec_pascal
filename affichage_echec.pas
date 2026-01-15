@@ -9,6 +9,7 @@ uses
   SDL2_gfx in 'SDL2-Pascal/units/sdl2_gfx.pas',
   echec_utilitaire,
   affichage_class;
+
 procedure AfficherEchiquier(echiquier: Techiquier; renderer: PSDL_Renderer);
 procedure AfficherPiece(echiquier: Techiquier; x, y: Integer; rect: TSDL_Rect; renderer: PSDL_Renderer);
 procedure InitialiserTextures(renderer: PSDL_Renderer);
@@ -16,12 +17,21 @@ procedure DestroyTextures;
 procedure InitialiserSDL;
 procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
 procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
+procedure initialiserMenuPrincipal;
+procedure gerer_event_menu(event: TSDL_Event; var menu: TMenu);
+procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
 
 
 const
   SCREEN_WIDTH = 640 ;
   SCREEN_HEIGHT = 360 ;
   taille_case = SCREEN_HEIGHT div 8;
+
+  TIMER_UPDATE = SDL_USEREVENT + 1; 
+
+  // Affichage actuel
+  MAINMENU = 0;
+  PARTIE_ECHEC = 1;
 
 var
   texture_piece: array[-ROI..ROI] of PSDL_Texture;
@@ -32,12 +42,15 @@ var
   renderer: PSDL_Renderer;
   event: TSDL_Event;
   x,y : Integer;
-  font : PTTF_Font;
+  font , font_detailler : PTTF_Font;
   couleur_affichage : Integer;
   actual_screen_width : Integer = 1600;
   actual_screen_heigth : Integer = 900;
   ratioscreen_x : Real ;
   ratioscreen_y : Real ;
+  MenuPrincipale : TMenu;
+  bouton : TBouton;
+  mode_affichage : Integer = MAINMENU;
   
   
 implementation
@@ -86,6 +99,7 @@ begin
     SDL_Quit;
     Halt(1);
   end;
+  font_detailler := TTF_OpenFont('font/gau_font_cube/GAU_cube_B.TTF', 50);
 
   icon := IMG_Load('image/pouce_en_air.png');
   SDL_SetWindowIcon(window,icon);
@@ -262,6 +276,9 @@ end;
 
 procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
 begin
+  if not partie.afficher then
+    Exit;
+  AfficherEchiquier(partie.echiquier,renderer);
   AfficherCase(renderer);
   AfficherAllPoint(partie,renderer);
   AfficherAllPiece(partie,renderer);
@@ -313,4 +330,57 @@ begin
   SDL_FreeSurface(surf);
 end;
 
+procedure initialiserMenuPrincipal;
+var couleurBG : TSDL_Color;
+begin
+  couleurBG := RGB(50,50,50);
+  MenuPrincipale := TMenu.Create(couleurBG);
+  bouton := TBouton.Create(100,50,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 100, RGB(200,200,200), RGB(100,100,100));
+  bouton.SetText('Nouvelle Partie', RGB(0,0,0), font_detailler);
+  bouton.Set_valeur_modifier(@mode_affichage, PARTIE_ECHEC);
+  MenuPrincipale.Ajouter_Bouton(bouton);
+end;
+
+procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
+begin
+ case event.type_ of
+    SDL_MOUSEMOTION: 
+    begin
+      partie.gestionaire.gerer_motion(event.motion.yrel) ;
+    end;
+    SDL_MOUSEWHEEL :
+    begin
+      partie.gestionaire.Scroll(event.wheel.y);
+    end;
+    SDL_MOUSEBUTTONDOWN :
+    begin
+      partie.gestionaire.gerer_clique;
+      if event.button.x > SCREEN_HEIGHT then
+        Exit;
+      x := event.button.x div taille_case;
+      y := event.button.y div taille_case;
+      gerer_clique(partie, x, y, renderer);
+    end;
+    SDL_MOUSEBUTTONUP:
+      partie.gestionaire.gerer_declique;
+
+    TIMER_UPDATE:
+      diminuer_timer(partie);
+
+  end;
+end;
+
+procedure gerer_event_menu(event: TSDL_Event; var menu: TMenu);
+begin
+  case event.type_ of
+    SDL_MOUSEMOTION: 
+    begin
+      menu.gerer_hover(ratioscreen_x,ratioscreen_y);
+    end;
+    SDL_MOUSEBUTTONDOWN :
+    begin
+      menu.gerer_clique(ratioscreen_x,ratioscreen_y);
+    end;
+  end;
+end;
 end.

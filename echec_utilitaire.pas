@@ -61,7 +61,7 @@ Type
     timer_blanc : Integer ;
     timer_noir : Integer ;
     gagnant : Integer ;
-    timer_on, cliquable : Boolean; 
+    timer_on, cliquable, afficher : Boolean; 
     affichage_coup_blanc,affichage_coup_noir : TAffichageScrollable;
     gestionaire : TGestionnaireTAffichageScrollable;
     font : PTTF_Font;
@@ -157,7 +157,7 @@ begin
 	Result.timer_blanc := 30*600 ;
 	Result.timer_noir := 30*600 ;
 	Result.gagnant := VIDE ;
-	Result.timer_on := True; Result.cliquable := True;
+	Result.timer_on := True; Result.cliquable := True; Result.afficher := True;
 	calculer_coup_couleur(Result,Result.couleur_joueur);
   Result.affichage_coup_blanc := TAffichageScrollable.Create(375, 60, 100, 200, 5, RGB(0,0,0));
   Result.affichage_coup_noir := TAffichageScrollable.Create(520, 60, 100, 200, 5, RGB(0,0,0));
@@ -669,7 +669,6 @@ function Coup_to_string(coup:TCoup):String;
 begin
   Result := '';
   Result += piece_to_lettre(coup.pieceDeplacee) + Char(97 + 7 - coup.yDepart) + IntToStr(coup.xDepart + 1) + '->' + Char(97 + 7 - coup.yArrivee) + IntToStr(coup.xArrivee + 1);
-  WriteLn('ahaha');
   if coup.pieceCapturee <> VIDE then 
     Result += ' x'
 end;
@@ -677,12 +676,10 @@ end;
 procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec;renderer : PSDL_Renderer);
 begin
 	jouer_coup(coup,partie.echiquier);
-  WriteLn('ez doi');
   if partie.couleur_joueur = BLANC then
     partie.affichage_coup_blanc.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer)
   else
     partie.affichage_coup_noir.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer);
-  WriteLn('ez doi');
 	partie.couleur_joueur := -partie.couleur_joueur;
 	calculer_coup_couleur(partie,partie.couleur_joueur);
 end;
