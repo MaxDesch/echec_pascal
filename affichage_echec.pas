@@ -17,9 +17,11 @@ procedure DestroyTextures;
 procedure InitialiserSDL;
 procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
 procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
-procedure initialiserMenuPrincipal;
+procedure InitialiserAllMenu;
 procedure gerer_event_menu(event: TSDL_Event; var menu: TMenu);
 procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
+procedure changer_mode_affichage(nouvelle_valeur: Integer);
+procedure gerer_event_parametre(event: TSDL_Event; var menu: TMenu);
 
 
 const
@@ -32,6 +34,10 @@ const
   // Affichage actuel
   MAINMENU = 0;
   PARTIE_ECHEC = 1;
+  MENUSOLO = 2;
+  MENUMULTI = 3;
+  MENUREPLAY = 4;
+
 
 var
   texture_piece: array[-ROI..ROI] of PSDL_Texture;
@@ -51,6 +57,12 @@ var
   MenuPrincipale : TMenu;
   bouton : TBouton;
   mode_affichage : Integer = MAINMENU;
+  ancien_mode_affichage : Integer = MAINMENU;
+  partie : TPartie_echec; 
+  MenuParametre : TMenu;
+  logoParametre : PSDL_Texture;
+  rect_logoMenuparametre : TSDL_Rect;
+  parametre_afficher : Integer = 0; // 0 = false , 1 = true
   
   
 implementation
@@ -188,16 +200,25 @@ begin
 end;
 
 procedure AfficherCase(renderer: PSDL_Renderer);
-var i, j: Integer;
+var
+  i, j: Integer;
   rect: TSDL_Rect;
 begin
-  rect.w := taille_case;
-  rect.h := taille_case;
   for i := 0 to 7 do
     for j := 0 to 7 do
     begin
-      rect.x := j * taille_case;
-      rect.y := i * taille_case;
+      if couleur_affichage = BLANC then
+      begin
+        rect.x := (7 - j) * taille_case;
+        rect.y := (7 - i) * taille_case;
+      end
+      else
+      begin
+        rect.x := j * taille_case;
+        rect.y := i * taille_case;
+      end;
+      rect.w := taille_case;
+      rect.h := taille_case;
       if (i + j) mod 2 = 0 then
         SDL_SetRenderDrawColor(renderer, 240, 217, 181, 255) // Couleur claire
       else
@@ -274,18 +295,6 @@ begin
   
 end;
 
-procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
-begin
-  if not partie.afficher then
-    Exit;
-  AfficherEchiquier(partie.echiquier,renderer);
-  AfficherCase(renderer);
-  AfficherAllPoint(partie,renderer);
-  AfficherAllPiece(partie,renderer);
-  AfficherInformation(partie,renderer);
-  partie.gestionaire.Draw(renderer);
-end;
-
 function string_temp(temp:Integer):string;
 begin
   if temp > 100 then
@@ -307,7 +316,7 @@ var rect_text : TSDL_Rect;
 begin
   text := string_temp(partie.timer_blanc);
   rect_text.x := SCREEN_HEIGHT + 30 + (5-Length(text))*17;
-  rect_text.y := 30;
+  rect_text.y := 70;
   rect_text.w := 70 - (5-Length(text))*17;
   rect_text.h := 25;
   
@@ -319,7 +328,7 @@ begin
 
   text := string_temp(partie.timer_noir);
   rect_text.x := SCREEN_HEIGHT + 170 + (5-Length(text))*17;
-  rect_text.y := 30;
+  rect_text.y := 70;
   rect_text.w := 70 - (5-Length(text))*17;
   rect_text.h := 25;
 
@@ -330,15 +339,57 @@ begin
   SDL_FreeSurface(surf);
 end;
 
+procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
+begin
+  AfficherCase(renderer);
+  AfficherAllPoint(partie,renderer);
+  AfficherAllPiece(partie,renderer);
+  AfficherInformation(partie,renderer);
+  partie.gestionaire.Draw(renderer);
+end;
+
 procedure initialiserMenuPrincipal;
 var couleurBG : TSDL_Color;
 begin
   couleurBG := RGB(50,50,50);
   MenuPrincipale := TMenu.Create(couleurBG);
-  bouton := TBouton.Create(100,50,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 100, RGB(200,200,200), RGB(100,100,100));
+  bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 100, RGB(200,200,200), RGB(100,100,100));
   bouton.SetText('Nouvelle Partie', RGB(0,0,0), font_detailler);
   bouton.Set_valeur_modifier(@mode_affichage, PARTIE_ECHEC);
   MenuPrincipale.Ajouter_Bouton(bouton);
+end;
+
+procedure initialiserMenuParametre;
+var couleurBG : TSDL_Color; rect_col : rect_color;
+begin
+  logoParametre := IMG_LoadTexture(renderer, 'image/image_parametre/engrenage_parametre.png');
+  rect_logoMenuparametre.x := SCREEN_WIDTH - 50;
+  rect_logoMenuparametre.y := 0;
+  rect_logoMenuparametre.w := 50;
+  rect_logoMenuparametre.h := 50;
+
+  couleurBG := RGBA(0,0,0,0);
+  MenuParametre := TMenu.Create(couleurBG);
+
+  rect_col.rect.x := 75;
+  rect_col.rect.y := 50;
+  rect_col.rect.w := SCREEN_WIDTH - 150;
+  rect_col.rect.h := SCREEN_HEIGHT - 100;
+  rect_col.color := RGB(200,200,200);
+  MenuParametre.Ajouter_Rect(rect_col);
+
+  bouton := TBouton.Create(405,250,SCREEN_WIDTH div 4, SCREEN_HEIGHT div 6 , RGB(50,200,50), RGB(20,100,20));
+  bouton.SetText('Retour au Menu', RGB(0,0,0), font_detailler);
+  bouton.Set_valeur_modifier(@mode_affichage, MAINMENU);
+  bouton.Set_valeur_modifier(@parametre_afficher, 0);
+
+  MenuParametre.Ajouter_Bouton(bouton);
+end;
+
+procedure InitialiserAllMenu;
+begin
+  initialiserMenuPrincipal;
+  initialiserMenuParametre;
 end;
 
 procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
@@ -383,4 +434,58 @@ begin
     end;
   end;
 end;
+
+procedure gerer_event_parametre(event: TSDL_Event; var menu: TMenu);
+begin
+  if parametre_afficher = 1 then
+  begin
+    case event.type_ of
+      SDL_MOUSEMOTION: 
+      begin
+        menu.gerer_hover(ratioscreen_x,ratioscreen_y);
+      end;
+      SDL_MOUSEBUTTONDOWN :
+      begin
+        menu.gerer_clique(ratioscreen_x,ratioscreen_y);
+      end;
+    end;
+  end;
+
+  if event.type_ = SDL_MOUSEBUTTONDOWN then
+  begin
+    if PointInRect(event.button.x, event.button.y, rect_logoMenuparametre) then
+      if parametre_afficher = 0 then
+        parametre_afficher := 1
+      else
+        parametre_afficher := 0;
+  end;
+end;
+
+procedure set_up_nouvelle_partie(var partie: TPartie_echec);
+begin
+  partie.affichage_coup_blanc.vider(renderer);
+  partie.affichage_coup_noir.vider(renderer);
+  partie.echiquier := InitialiserEchiquier();
+
+  partie.gagnant := VIDE;
+
+  partie.timer_blanc := 30*60*10; // 30 minutes en dixièmes de seconde
+  partie.timer_noir := 30*60*10;
+
+  calculer_coup_couleur(partie, BLANC);
+end;
+
+procedure changer_mode_affichage(nouvelle_valeur: Integer);
+begin
+  mode_affichage := nouvelle_valeur;
+  case nouvelle_valeur of
+    MAINMENU: ;
+    PARTIE_ECHEC: begin
+      couleur_affichage := BLANC;
+      set_up_nouvelle_partie(partie);
+
+    end;
+  end;
+end;
+
 end.

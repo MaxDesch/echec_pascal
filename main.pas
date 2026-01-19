@@ -21,9 +21,7 @@ uses
 
 
 var
-  partie : TPartie_echec;
   running: Boolean;
-  x,y : Integer;
   timerID :TSDL_TimerID;
 
 function TimerCallback(interval: UInt32; param: Pointer): UInt32; cdecl;
@@ -47,7 +45,7 @@ end;
 begin
   InitialiserSDL;
   InitialiserTextures(renderer);
-  initialiserMenuPrincipal;
+  InitialiserAllMenu;
   
   timerID := SDL_AddTimer(100, @TimerCallback, nil);
 
@@ -64,9 +62,15 @@ begin
     Halt;
   while SDL_PollEvent(@event) <> 0 do
   begin
-    case MODE_AFFICHAGE of
-      MAINMENU: gerer_event_menu(event, MenuPrincipale);
-      PARTIE_ECHEC: gerer_event_partie(event, partie);
+
+    gerer_event_parametre(event, MenuParametre);
+
+    if parametre_afficher = 0 then
+    begin
+      case ancien_mode_affichage of
+        MAINMENU: gerer_event_menu(event, MenuPrincipale);
+        PARTIE_ECHEC: gerer_event_partie(event, partie);
+      end;
     end;
     
     case event.type_ of
@@ -84,7 +88,6 @@ begin
           SDLK_w:
           begin
             WriteLn(Ord('a'));
-            //affichagescrollable.Ajouter_Surface(TTF_RenderText_Solid(font, 'ez', RGB(255,255,255)),renderer);
           end;
         end;
       end;
@@ -94,14 +97,29 @@ begin
     SDL_SetRenderDrawColor(renderer, 125, 125, 125, 255);
     SDL_RenderClear(renderer);
 
+    // Gestion des changements de mode
+    if ancien_mode_affichage <> mode_affichage then
+    begin
+      changer_mode_affichage(mode_affichage);
+      ancien_mode_affichage := mode_affichage;
+    end;
+
     // Affichage selon le mode
-    case MODE_AFFICHAGE of
+    case mode_affichage of
       MAINMENU: 
         MenuPrincipale.Draw(renderer);
       PARTIE_ECHEC:
+      begin
         AfficherPartie(partie,renderer);
+        end;
     end;
-
+    // Affichage du menu paramètre si activé
+    if (parametre_afficher =  1) then
+    begin
+      MenuParametre.Draw(renderer);
+    end;
+    // Affichage de l'icône du menu paramètre
+    SDL_RenderCopy(renderer, logoParametre, nil, @rect_logoMenuparametre);
 
     SDL_RenderPresent(renderer);
     SDL_Delay(16);

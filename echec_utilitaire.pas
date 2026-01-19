@@ -159,8 +159,8 @@ begin
 	Result.gagnant := VIDE ;
 	Result.timer_on := True; Result.cliquable := True; Result.afficher := True;
 	calculer_coup_couleur(Result,Result.couleur_joueur);
-  Result.affichage_coup_blanc := TAffichageScrollable.Create(375, 60, 100, 200, 5, RGB(0,0,0));
-  Result.affichage_coup_noir := TAffichageScrollable.Create(520, 60, 100, 200, 5, RGB(0,0,0));
+  Result.affichage_coup_blanc := TAffichageScrollable.Create(375, 100, 100, 200, 5, RGB(0,0,0));
+  Result.affichage_coup_noir := TAffichageScrollable.Create(520, 100, 100, 200, 5, RGB(0,0,0));
   Result.gestionaire := TGestionnaireTAffichageScrollable.Create;
   Result.gestionaire.Ajout_Affichage(@Result.affichage_coup_blanc);
   Result.gestionaire.Ajout_Affichage(@Result.affichage_coup_noir);

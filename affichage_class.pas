@@ -12,6 +12,11 @@ uses
   Math;
 type
 
+  rect_color = record
+    rect : TSDL_Rect;
+    color : TSDL_Color;
+  end;
+
   PInt = ^Integer;
 
   TBouton = class
@@ -24,8 +29,8 @@ type
     Ftext: string;
     FColorText: TSDL_Color;
     pointer_font : PTTF_Font;
-    Fpointer_valeur_modifier : PInt;
-    Fvaleur_modifier : Integer;
+    Fpointer_valeur_modifier : array of PInt;
+    Fvaleur_modifier : array of Integer;
   public
     constructor Create(AX, AY, AWidth, AHeight: Integer; AColor, AHoveredColor: TSDL_Color);
     procedure SetText(AText: string; AColor: TSDL_Color; font: PTTF_Font);
@@ -55,6 +60,7 @@ type
     procedure gerer_clique(x,y:Integer; dx,dy: Real);
     procedure gerer_declique;
     procedure gerer_motion(y : Integer);
+    procedure vider(renderer: PSDL_Renderer);
   end;
 
   PAffichageScrollable = ^TAffichageScrollable ;
@@ -81,6 +87,20 @@ type
   private
     FCouleurBG : TSDL_Color;
     FButtons : array of TBouton;
+    FRect : array of rect_color;
+  public
+    constructor Create(AColorBG: TSDL_Color);
+    procedure Ajouter_Bouton(bouton: TBouton);
+    procedure Ajouter_Rect(r: rect_color);
+    procedure Draw(ARenderer: PSDL_Renderer);
+    procedure gerer_clique(dx,dy: Real);
+    procedure gerer_hover(dx,dy: Real);
+  end;
+
+  TMenuDeSelectionPiece = class
+  private
+    FCouleurBG : TSDL_Color;
+    FButtons : array of TBouton;
   public
     constructor Create(AColorBG: TSDL_Color);
     procedure Ajouter_Bouton(bouton: TBouton);
@@ -93,7 +113,7 @@ function RGB(r, g, b: Byte): TSDL_Color;
 function RGBA(r, g, b, a: Byte): TSDL_Color;
 function Min(a, b: Byte): Byte;
 function PointInRect(px, py: Integer; R: TSDL_Rect): Boolean;
-
+function PointInRectScalaire(px, py: Integer; dx, dy : Real; R: TSDL_Rect): Boolean;
 
 implementation
 
@@ -263,18 +283,21 @@ end;
 
 procedure TBouton.Set_valeur_modifier(Aptr : PInt; Avaleur_modifier : Integer);
 begin
-  Fpointer_valeur_modifier := Aptr;
-  Fvaleur_modifier := Avaleur_modifier;
+  SetLength(Fpointer_valeur_modifier, Length(Fpointer_valeur_modifier) + 1);
+  SetLength(Fvaleur_modifier, Length(Fvaleur_modifier) + 1);
+  Fpointer_valeur_modifier[Length(Fpointer_valeur_modifier) - 1] := Aptr;
+  Fvaleur_modifier[Length(Fvaleur_modifier) - 1] := Avaleur_modifier;
 end;
 
 procedure TBouton.gerer_clique(dx,dy : Real);
-var x,y : Integer;
+var x,y, i : Integer;
 begin
   SDL_GetMouseState(@x,@y);
   if PointInRectScalaire(x,y,dx,dy,FRect) then
-  begin
+  begin 
     if Fpointer_valeur_modifier <> nil then
-      Fpointer_valeur_modifier^ := Fvaleur_modifier;
+      for i := 0 to Length(Fpointer_valeur_modifier) - 1 do
+        Fpointer_valeur_modifier[i]^ := Fvaleur_modifier[i];
   end;
 end;
 
@@ -381,6 +404,19 @@ begin
   self.AjusterScrollBar;
 end;
 
+procedure TAffichageScrollable.vider(renderer: PSDL_Renderer);
+var i : Integer;
+begin
+  for i := 0 to Length(FListeSurface) -1 do
+    SDL_FreeSurface(FListeSurface[i]);
+  SetLength(FListeSurface,0);
+  SDL_FreeSurface(FSurfaceReel);
+  FSurfaceReel := SDL_CreateRGBSurface(0, FRectBG.w, 1, 32, $000000FF, $0000FF00, $00FF0000, $FF000000);
+  SDL_DestroyTexture(FTextureReel);
+  FTextureReel := SDL_CreateTextureFromSurface(renderer, FSurfaceReel);
+  FRectTextureToAffichage.y := 0;
+  self.AjusterScrollBar;
+end;
 
 procedure TAffichageScrollable.detruire;
 var i : Integer;
@@ -475,11 +511,25 @@ begin
   FButtons[Length(FButtons) - 1] := bouton;
 end;
 
+procedure TMenu.Ajouter_Rect(r: rect_color);
+begin
+  SetLength(FRect, Length(FRect) + 1);
+  FRect[Length(FRect) - 1] := r;
+end;
+
 procedure TMenu.Draw(ARenderer: PSDL_Renderer);
 var i : Integer;
 begin
-  SDL_SetRenderDrawColor(ARenderer, FCouleurBG.r, FCouleurBG.g, FCouleurBG.b, FCouleurBG.a);
-  SDL_RenderClear(ARenderer);
+  if FCouleurBG.a <> 0 then
+  begin
+    SDL_SetRenderDrawColor(ARenderer, FCouleurBG.r, FCouleurBG.g, FCouleurBG.b, FCouleurBG.a);
+    SDL_RenderClear(ARenderer);
+  end;
+  for i := 0 to Length(FRect) - 1 do
+  begin
+    SDL_SetRenderDrawColor(ARenderer, FRect[i].color.r, FRect[i].color.g, FRect[i].color.b, FRect[i].color.a);
+    SDL_RenderFillRect(ARenderer, @FRect[i].rect);
+  end;
   for i := 0 to Length(FButtons) - 1 do
     FButtons[i].Draw(ARenderer);
 end; 
@@ -492,6 +542,56 @@ begin
 end;
 
 procedure TMenu.gerer_hover(dx,dy: Real);
+var i : Integer;
+begin
+  for i := 0 to Length(FButtons) -1 do
+    FButtons[i].gerer_hover(dx,dy);
+end;
+
+{ TMenuDeSelectionPiece }
+
+constructor TMenuDeSelectionPiece.Create(AColorBG: TSDL_Color);
+var i : Integer; bouton : TBouton;
+begin
+  FCouleurBG := AColorBG;
+  FButtons := [];
+  for i := 0 to 3 do
+  begin
+    bouton := TBouton.Create(50, 100 + i*50, 200, 60, RGB(200,200,200), RGB(220,220,220));
+    case i of
+      0 : bouton.SetText('Dame', RGB(0,0,0), nil);
+      1 : bouton.SetText('Tour', RGB(0,0,0), nil);
+      2 : bouton.SetText('Fou', RGB(0,0,0), nil);
+      3 : bouton.SetText('Cavalier', RGB(0,0,0), nil);
+    end;
+
+    self.Ajouter_Bouton(bouton);
+  end;
+end;
+
+procedure TMenuDeSelectionPiece.Ajouter_Bouton(bouton: TBouton);
+begin
+  SetLength(FButtons, Length(FButtons) + 1);
+  FButtons[Length(FButtons) - 1] := bouton;
+end;
+
+procedure TMenuDeSelectionPiece.Draw(ARenderer: PSDL_Renderer);
+var i : Integer;
+begin
+  SDL_SetRenderDrawColor(ARenderer, FCouleurBG.r, FCouleurBG.g, FCouleurBG.b, FCouleurBG.a);
+  SDL_RenderClear(ARenderer);
+  for i := 0 to Length(FButtons) - 1 do
+    FButtons[i].Draw(ARenderer);
+end;
+
+procedure TMenuDeSelectionPiece.gerer_clique(dx,dy: Real);
+var i : Integer;
+begin
+  for i := 0 to Length(FButtons) -1 do
+    FButtons[i].gerer_clique(dx,dy);
+end;
+
+procedure TMenuDeSelectionPiece.gerer_hover(dx,dy: Real);
 var i : Integer;
 begin
   for i := 0 to Length(FButtons) -1 do
