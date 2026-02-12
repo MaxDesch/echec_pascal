@@ -31,12 +31,16 @@ const
 
   TIMER_UPDATE = SDL_USEREVENT + 1; 
 
+  MENUPARAMPASAFFICHER = 0;
+  MENUPARAMAFFICHER = 1;
+  PARTIEAFFICHER = 1;
+
   // Affichage actuel
-  MAINMENU = 0;
-  PARTIE_ECHEC = 1;
-  MENUSOLO = 2;
-  MENUMULTI = 3;
-  MENUREPLAY = 4;
+  AFFMAINMENU = 0;
+  AFFPARTIE_ECHEC = 1;
+  AFFMENUSOLO = 2;
+  AFFMENUMULTI = 3;
+  AFFMENUREPLAY = 4;
 
 
 var
@@ -56,13 +60,16 @@ var
   ratioscreen_y : Real ;
   MenuPrincipale : TMenu;
   bouton : TBouton;
-  mode_affichage : Integer = MAINMENU;
-  ancien_mode_affichage : Integer = MAINMENU;
+  mode_affichage : Integer = AFFMAINMENU;
+  ancien_mode_affichage : Integer = AFFMAINMENU;
   partie : TPartie_echec; 
   MenuParametre : TMenu;
   logoParametre : PSDL_Texture;
   rect_logoMenuparametre : TSDL_Rect;
-  parametre_afficher : Integer = 0; // 0 = false , 1 = true
+  parametre_afficher : Integer = MENUPARAMPASAFFICHER; // 0 = false , 1 = true
+  MenuReplay : TMenu;
+  MenuSolo : TMenu;
+  MenuMulti : TMenu;
   
   
 implementation
@@ -353,9 +360,17 @@ var couleurBG : TSDL_Color;
 begin
   couleurBG := RGB(50,50,50);
   MenuPrincipale := TMenu.Create(couleurBG);
-  bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 100, RGB(200,200,200), RGB(100,100,100));
-  bouton.SetText('Nouvelle Partie', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, PARTIE_ECHEC);
+  bouton := TBouton.Create(100,75,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
+  bouton.SetText(' allez au menu solo', RGB(0,0,0), font_detailler);
+  bouton.Set_valeur_modifier(@mode_affichage, AFFMENUSOLO);
+  MenuPrincipale.Ajouter_Bouton(bouton);
+  bouton := TBouton.Create(100,140,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
+  bouton.SetText(' allez au menu multi', RGB(0,0,0), font_detailler);
+  bouton.Set_valeur_modifier(@mode_affichage, AFFMENUMULTI);
+  MenuPrincipale.Ajouter_Bouton(bouton);
+  bouton := TBouton.Create(100,205,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
+  bouton.SetText(' allez au menu replay', RGB(0,0,0), font_detailler);
+  bouton.Set_valeur_modifier(@mode_affichage, AFFMENUREPLAY);
   MenuPrincipale.Ajouter_Bouton(bouton);
 end;
 
@@ -378,17 +393,29 @@ begin
   rect_col.color := RGB(200,200,200);
   MenuParametre.Ajouter_Rect(rect_col);
 
-  bouton := TBouton.Create(405,250,SCREEN_WIDTH div 4, SCREEN_HEIGHT div 6 , RGB(50,200,50), RGB(20,100,20));
+  bouton := TBouton.Create(405,280,SCREEN_WIDTH div 4, SCREEN_HEIGHT div 12 , RGB(50,200,50), RGB(20,100,20));
   bouton.SetText('Retour au Menu', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, MAINMENU);
+  bouton.Set_valeur_modifier(@mode_affichage, AFFMAINMENU);
   bouton.Set_valeur_modifier(@parametre_afficher, 0);
 
   MenuParametre.Ajouter_Bouton(bouton);
 end;
 
+procedure initialiserMenuSolo;
+var couleurBG : TSDL_Color;
+begin
+  couleurBG := RGB(50,50,50);
+  MenuSolo := TMenu.Create(couleurBG);
+  bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, 60, RGB(200,200,200), RGB(100,100,100));
+  bouton.SetText('Nouvelle Partie 1v1', RGB(0,0,0), font_detailler);
+  bouton.Set_valeur_modifier(@mode_affichage, AFFPARTIE_ECHEC);
+  MenuSolo.Ajouter_Bouton(bouton);
+end;
+
 procedure InitialiserAllMenu;
 begin
   initialiserMenuPrincipal;
+  initialiserMenuSolo; 
   initialiserMenuParametre;
 end;
 
@@ -479,8 +506,8 @@ procedure changer_mode_affichage(nouvelle_valeur: Integer);
 begin
   mode_affichage := nouvelle_valeur;
   case nouvelle_valeur of
-    MAINMENU: ;
-    PARTIE_ECHEC: begin
+    AFFMAINMENU: ;
+    AFFPARTIE_ECHEC: begin
       couleur_affichage := BLANC;
       set_up_nouvelle_partie(partie);
 

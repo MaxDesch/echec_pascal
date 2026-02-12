@@ -48,6 +48,7 @@ type
     FCouleurBG : TSDL_Color;
     FSurfaceReel : PSDL_Surface;
     FTextureReel : PSDL_Texture;
+    FRectSrollBarBG : TSDL_Rect;
     FListeSurface : array of PSDL_Surface;
     drag : Boolean;
     procedure AjusterScrollBar;
@@ -81,6 +82,16 @@ type
     procedure gerer_declique;
     procedure gerer_motion(y : Integer);
     procedure detruire;
+  end;
+
+  TAffichageScrollableCliquable = class(TAffichageScrollable)
+  private
+    lst_mot_cliquer : array of String;
+    mot_cliquer_index : Integer;
+  public
+    constructor Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
+    procedure Ajouter_Surface(surface: PSDL_Surface; renderer: PSDL_Renderer; nom_clique : String) ;
+    procedure gerer_clique(dy : Real);
   end;
 
   TMenu = class
@@ -238,10 +249,10 @@ begin
   FRect.y := AY;
   FRect.w := AWidth;
   FRect.h := AHeight;
-  FRectText.x := AX + 20;
-  FRectText.y := AY + 20;
-  FRectText.w := AWidth - 40;
-  FRectText.h := AHeight - 40;
+  FRectText.x := AX + Floor(AWidth * 0.1);
+  FRectText.y := AY + Floor(AHeight * 0.1);
+  FRectText.w := Floor(AWidth * 0.8);
+  FRectText.h := Floor(AHeight * 0.8);
   FColor := AColor;
   Fclicked := False;
   FHovered := False;
@@ -313,6 +324,10 @@ begin
   FRectSrollBar.y := AY;
   FRectSrollBar.w := AWidth div 12;
   FRectSrollBar.h := AHeight;
+  FRectSrollBarBG.x := AX + AWidth - (AWidth div 12);
+  FRectSrollBarBG.y := AY;
+  FRectSrollBarBG.w := AWidth div 12;
+  FRectSrollBarBG.h := AHeight;
   FRectTextureToAffichage.x := 0;
   FRectTextureToAffichage.y := 0;
   FRectTextureToAffichage.w := AWidth;
@@ -331,6 +346,9 @@ begin
   SDL_RenderFillRect(ARenderer, @FRectBG);
   SDL_RenderCopy(ARenderer, FTextureReel, @FRectTextureToAffichage, @FRectAffichage);
   
+  SDL_SetRenderDrawColor(ARenderer, 100, 100, 100, 255);
+  SDL_RenderFillRect(ARenderer, @FRectSrollBarBG);
+
   SDL_SetRenderDrawColor(ARenderer, 150, 150, 150, 255);
   SDL_RenderFillRect(ARenderer, @FRectSrollBar);
 end;
@@ -496,6 +514,42 @@ begin
   for i := 0 to Length(tab_Affichage)-1 do
     tab_Affichage[i]^.detruire;
 end;
+
+{ TAffichageScrollableCliquable }
+
+constructor TAffichageScrollableCliquable.Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
+begin
+  inherited Create(AX, AY, AWidth, AHeight, AEcart, AColor);
+  lst_mot_cliquer := [];
+  mot_cliquer_index := -1;
+end;
+
+procedure TAffichageScrollableCliquable.Ajouter_Surface(surface: PSDL_Surface; renderer: PSDL_Renderer; nom_clique : String);
+begin
+  inherited Ajouter_Surface(surface, renderer);
+  SetLength(lst_mot_cliquer, Length(lst_mot_cliquer) + 1);
+  lst_mot_cliquer[Length(lst_mot_cliquer) - 1] := nom_clique;
+end;
+
+procedure TAffichageScrollableCliquable.gerer_clique(dy : Real);
+var i, hauteur_act , x, y : Integer;
+begin
+  hauteur_act := 0;
+  SDL_GetMouseState(@x,@y);
+  for i := 0 to Length(FListeSurface) -1 do
+  begin
+    if (FRectTextureToAffichage.y <= hauteur_act + FListeSurface[i]^.h) and
+       (FRectTextureToAffichage.y >= hauteur_act) then
+      if (FRectAffichage.y <= y * dy) and
+          (FRectAffichage.y + FRectAffichage.h >= y) then
+      begin
+        mot_cliquer_index := i;
+        Exit;
+      end;
+    hauteur_act += FListeSurface[i]^.h + FEcart;
+  end;
+end;
+
 
 
 { TMenu }

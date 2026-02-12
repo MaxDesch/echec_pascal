@@ -65,11 +65,13 @@ begin
 
     gerer_event_parametre(event, MenuParametre);
 
-    if parametre_afficher = 0 then
+    if parametre_afficher = MENUPARAMPASAFFICHER then
     begin
       case ancien_mode_affichage of
-        MAINMENU: gerer_event_menu(event, MenuPrincipale);
-        PARTIE_ECHEC: gerer_event_partie(event, partie);
+        AFFMAINMENU: gerer_event_menu(event, MenuPrincipale);
+        AFFMENUSOLO : gerer_event_menu(event, MenuSolo); 
+        AFFMENUMULTI : gerer_event_menu(event, MenuMulti);
+        AFFPARTIE_ECHEC: gerer_event_partie(event, partie);
       end;
     end;
     
@@ -106,15 +108,21 @@ begin
 
     // Affichage selon le mode
     case mode_affichage of
-      MAINMENU: 
+      AFFMAINMENU: 
         MenuPrincipale.Draw(renderer);
-      PARTIE_ECHEC:
+      
+      AFFMENUSOLO: MenuSolo.Draw(renderer);
+      
+      AFFMENUMULTI: MenuMulti.Draw(renderer);
+
+      AFFPARTIE_ECHEC:
       begin
         AfficherPartie(partie,renderer);
-        end;
+      end;
+      
     end;
     // Affichage du menu paramètre si activé
-    if (parametre_afficher =  1) then
+    if (parametre_afficher =  MENUPARAMAFFICHER) then
     begin
       MenuParametre.Draw(renderer);
     end;
