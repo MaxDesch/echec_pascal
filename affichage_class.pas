@@ -16,7 +16,7 @@ type
     rect : TSDL_Rect;
     color : TSDL_Color;
   end;
-
+  TProc = procedure ;
   PInt = ^Integer;
 
   TBouton = class
@@ -29,12 +29,12 @@ type
     Ftext: string;
     FColorText: TSDL_Color;
     pointer_font : PTTF_Font;
-    Fpointer_valeur_modifier : array of PInt;
-    Fvaleur_modifier : array of Integer;
+    Fprocedure : TProc;
   public
     constructor Create(AX, AY, AWidth, AHeight: Integer; AColor, AHoveredColor: TSDL_Color);
     procedure SetText(AText: string; AColor: TSDL_Color; font: PTTF_Font);
-    procedure Set_valeur_modifier(Aptr : PInt; Avaleur_modifier : Integer);
+    function getText() : String;
+    procedure SetProcedure(proc : TProc);
     procedure gerer_clique(dx,dy: Real);
     procedure gerer_hover(dx,dy: Real);
     procedure Draw(ARenderer: PSDL_Renderer);
@@ -53,7 +53,7 @@ type
     drag : Boolean;
     procedure AjusterScrollBar;
   public
-    constructor Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
+    constructor Create(AX, AY, AWidth, AHeight, AEcart, portion_scrollbar: Integer; AColor: TSDL_Color);
     procedure Draw(ARenderer: PSDL_Renderer);
     procedure Ajouter_Surface(surface: PSDL_Surface; renderer: PSDL_Renderer);
     procedure detruire;
@@ -89,9 +89,9 @@ type
     lst_mot_cliquer : array of String;
     mot_cliquer_index : Integer;
   public
-    constructor Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
+    constructor Create(AX, AY, AWidth, AHeight, AEcart, Aportion_scrollbar: Integer; AColor: TSDL_Color);
     procedure Ajouter_Surface(surface: PSDL_Surface; renderer: PSDL_Renderer; nom_clique : String) ;
-    procedure gerer_clique(dy : Real);
+    procedure gerer_clique(dx,dy: Real);
   end;
 
   TMenu = class
@@ -99,22 +99,25 @@ type
     FCouleurBG : TSDL_Color;
     FButtons : array of TBouton;
     FRect : array of rect_color;
+    FAffichageScrollableCliquable : TAffichageScrollableCliquable;
   public
     constructor Create(AColorBG: TSDL_Color);
     procedure Ajouter_Bouton(bouton: TBouton);
     procedure Ajouter_Rect(r: rect_color);
+    procedure Ajouter_AffichageScrollableCliquable(Aff : TAffichageScrollableCliquable);
     procedure Draw(ARenderer: PSDL_Renderer);
     procedure gerer_clique(dx,dy: Real);
+    procedure gerer_motion(y: Integer);
     procedure gerer_hover(dx,dy: Real);
   end;
 
   TMenuDeSelectionPiece = class
   private
-    FCouleurBG : TSDL_Color;
     FButtons : array of TBouton;
   public
-    constructor Create(AColorBG: TSDL_Color);
+    constructor Create(font: PTTF_Font);
     procedure Ajouter_Bouton(bouton: TBouton);
+    procedure assignerProcedure(proc : TProc; piece : String);
     procedure Draw(ARenderer: PSDL_Renderer);
     procedure gerer_clique(dx,dy: Real);
     procedure gerer_hover(dx,dy: Real);
@@ -250,7 +253,7 @@ begin
   FRect.w := AWidth;
   FRect.h := AHeight;
   FRectText.x := AX + Floor(AWidth * 0.1);
-  FRectText.y := AY + Floor(AHeight * 0.1);
+  FRectText.y := AY + Floor(AHeight * 0.15);
   FRectText.w := Floor(AWidth * 0.8);
   FRectText.h := Floor(AHeight * 0.8);
   FColor := AColor;
@@ -260,11 +263,17 @@ begin
   FColorText := RGB(0, 0, 0);
   FHoveredColor := AHoveredColor;
 end;
+
 procedure TBouton.SetText(AText: string; AColor: TSDL_Color; font: PTTF_Font);
 begin
   Ftext := AText;
   FColorText := AColor;
   pointer_font := font;
+end;
+
+function TBouton.getText():String;
+begin
+  Result := Ftext;
 end;
 
 procedure TBouton.gerer_hover(dx,dy: Real);
@@ -292,27 +301,23 @@ begin
 
 end;
 
-procedure TBouton.Set_valeur_modifier(Aptr : PInt; Avaleur_modifier : Integer);
+procedure TBouton.SetProcedure(proc: TProc);
 begin
-  SetLength(Fpointer_valeur_modifier, Length(Fpointer_valeur_modifier) + 1);
-  SetLength(Fvaleur_modifier, Length(Fvaleur_modifier) + 1);
-  Fpointer_valeur_modifier[Length(Fpointer_valeur_modifier) - 1] := Aptr;
-  Fvaleur_modifier[Length(Fvaleur_modifier) - 1] := Avaleur_modifier;
+  Fprocedure := proc;
 end;
 
 procedure TBouton.gerer_clique(dx,dy : Real);
-var x,y, i : Integer;
+var x,y : Integer;
 begin
   SDL_GetMouseState(@x,@y);
   if PointInRectScalaire(x,y,dx,dy,FRect) then
   begin 
-    if Fpointer_valeur_modifier <> nil then
-      for i := 0 to Length(Fpointer_valeur_modifier) - 1 do
-        Fpointer_valeur_modifier[i]^ := Fvaleur_modifier[i];
+    if Assigned(Fprocedure) then
+      Fprocedure();
   end;
 end;
 
-constructor TAffichageScrollable.Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
+constructor TAffichageScrollable.Create(AX, AY, AWidth, AHeight, AEcart, portion_scrollbar: Integer; AColor: TSDL_Color);
 begin
   FEcart := AEcart;
   FRectAffichage.x := AX;
@@ -320,13 +325,13 @@ begin
   FRectAffichage.w := AWidth;
   FRectAffichage.h := 1;
   FCouleurBG := AColor;
-  FRectSrollBar.x := AX + AWidth - (AWidth div 12);
+  FRectSrollBar.x := AX + AWidth - (AWidth div portion_scrollbar);
   FRectSrollBar.y := AY;
-  FRectSrollBar.w := AWidth div 12;
+  FRectSrollBar.w := AWidth div portion_scrollbar;
   FRectSrollBar.h := AHeight;
-  FRectSrollBarBG.x := AX + AWidth - (AWidth div 12);
+  FRectSrollBarBG.x := AX + AWidth - (AWidth div portion_scrollbar);
   FRectSrollBarBG.y := AY;
-  FRectSrollBarBG.w := AWidth div 12;
+  FRectSrollBarBG.w := AWidth div portion_scrollbar;
   FRectSrollBarBG.h := AHeight;
   FRectTextureToAffichage.x := 0;
   FRectTextureToAffichage.y := 0;
@@ -380,7 +385,6 @@ begin
   SDL_DestroyTexture(FTextureReel);
   FTextureReel := SDL_CreateTextureFromSurface(renderer, FSurfaceReel);
   self.AjusterScrollBar;
-  WriteLn(FRectSrollBar.h, '    ', FSurfaceReel^.h);
 end;
 
 procedure TAffichageScrollable.Scroll(dir:Integer; dx,dy : Real);
@@ -495,12 +499,14 @@ begin
   for i := 0 to Length(tab_Affichage)-1 do
     tab_Affichage[i]^.gerer_clique(x,y,dx^,dy^);
 end;
+
 procedure TGestionnaireTAffichageScrollable.gerer_declique;
 var i : Integer; 
 begin
   for i := 0 to Length(tab_Affichage)-1 do
     tab_Affichage[i]^.gerer_declique;
 end;
+
 procedure TGestionnaireTAffichageScrollable.gerer_motion(y : Integer);
 var i : Integer; 
 begin
@@ -517,9 +523,9 @@ end;
 
 { TAffichageScrollableCliquable }
 
-constructor TAffichageScrollableCliquable.Create(AX, AY, AWidth, AHeight, AEcart: Integer; AColor: TSDL_Color);
+constructor TAffichageScrollableCliquable.Create(AX, AY, AWidth, AHeight, AEcart, Aportion_scrollbar: Integer; AColor: TSDL_Color);
 begin
-  inherited Create(AX, AY, AWidth, AHeight, AEcart, AColor);
+  inherited Create(AX, AY, AWidth, AHeight, AEcart, Aportion_scrollbar, AColor);
   lst_mot_cliquer := [];
   mot_cliquer_index := -1;
 end;
@@ -531,21 +537,24 @@ begin
   lst_mot_cliquer[Length(lst_mot_cliquer) - 1] := nom_clique;
 end;
 
-procedure TAffichageScrollableCliquable.gerer_clique(dy : Real);
+procedure TAffichageScrollableCliquable.gerer_clique(dx,dy: Real);
 var i, hauteur_act , x, y : Integer;
 begin
   hauteur_act := 0;
   SDL_GetMouseState(@x,@y);
+  inherited gerer_clique(x,y, dx,dy);
   for i := 0 to Length(FListeSurface) -1 do
   begin
     if (FRectTextureToAffichage.y <= hauteur_act + FListeSurface[i]^.h) and
        (FRectTextureToAffichage.y >= hauteur_act) then
-      if (FRectAffichage.y <= y * dy) and
+    begin
+      if (FRectAffichage.y <= y*dy) and
           (FRectAffichage.y + FRectAffichage.h >= y) then
       begin
         mot_cliquer_index := i;
         Exit;
       end;
+    end;
     hauteur_act += FListeSurface[i]^.h + FEcart;
   end;
 end;
@@ -571,6 +580,11 @@ begin
   FRect[Length(FRect) - 1] := r;
 end;
 
+procedure TMenu.Ajouter_AffichageScrollableCliquable(Aff: TAffichageScrollableCliquable);
+begin
+  FAffichageScrollableCliquable := Aff;
+end;
+
 procedure TMenu.Draw(ARenderer: PSDL_Renderer);
 var i : Integer;
 begin
@@ -586,6 +600,8 @@ begin
   end;
   for i := 0 to Length(FButtons) - 1 do
     FButtons[i].Draw(ARenderer);
+  if Assigned(FAffichageScrollableCliquable) then
+    FAffichageScrollableCliquable.Draw(ARenderer);
 end; 
 
 procedure TMenu.gerer_clique(dx,dy: Real);
@@ -593,6 +609,14 @@ var i : Integer;
 begin
   for i := 0 to Length(FButtons) -1 do
     FButtons[i].gerer_clique(dx,dy);
+  if Assigned(FAffichageScrollableCliquable) then
+    FAffichageScrollableCliquable.gerer_clique(dx,dy);
+end;
+
+procedure TMenu.gerer_motion(y:Integer);
+begin
+  if Assigned(FAffichageScrollableCliquable) then
+    FAffichageScrollableCliquable.gerer_motion(y);
 end;
 
 procedure TMenu.gerer_hover(dx,dy: Real);
@@ -604,23 +628,33 @@ end;
 
 { TMenuDeSelectionPiece }
 
-constructor TMenuDeSelectionPiece.Create(AColorBG: TSDL_Color);
+constructor TMenuDeSelectionPiece.Create(font: PTTF_Font);
 var i : Integer; bouton : TBouton;
 begin
-  FCouleurBG := AColorBG;
   FButtons := [];
   for i := 0 to 3 do
   begin
-    bouton := TBouton.Create(50, 100 + i*50, 200, 60, RGB(200,200,200), RGB(220,220,220));
+    bouton := TBouton.Create(50, 100 + i*50, 200, 50, RGB(200,200,200), RGB(220,220,220));
     case i of
-      0 : bouton.SetText('Dame', RGB(0,0,0), nil);
-      1 : bouton.SetText('Tour', RGB(0,0,0), nil);
-      2 : bouton.SetText('Fou', RGB(0,0,0), nil);
-      3 : bouton.SetText('Cavalier', RGB(0,0,0), nil);
+      0 : bouton.SetText('Dame', RGB(0,0,0), font);
+      1 : bouton.SetText('Tour', RGB(0,0,0), font);
+      2 : bouton.SetText('Fou', RGB(0,0,0), font);
+      3 : bouton.SetText('Cavalier', RGB(0,0,0), font);
     end;
 
     self.Ajouter_Bouton(bouton);
   end;
+end;
+
+procedure TMenuDeSelectionPiece.assignerProcedure(proc : TProc; piece : String);
+begin
+  case piece of
+    'Dame' : FButtons[0].SetProcedure(proc);
+    'Tour' : FButtons[1].SetProcedure(proc);
+    'Fou' : FButtons[2].SetProcedure(proc);
+    'Cavalier' : FButtons[3].SetProcedure(proc);
+  end;
+  Writeln('Procédure assignée à ' + piece);
 end;
 
 procedure TMenuDeSelectionPiece.Ajouter_Bouton(bouton: TBouton);
@@ -632,8 +666,6 @@ end;
 procedure TMenuDeSelectionPiece.Draw(ARenderer: PSDL_Renderer);
 var i : Integer;
 begin
-  SDL_SetRenderDrawColor(ARenderer, FCouleurBG.r, FCouleurBG.g, FCouleurBG.b, FCouleurBG.a);
-  SDL_RenderClear(ARenderer);
   for i := 0 to Length(FButtons) - 1 do
     FButtons[i].Draw(ARenderer);
 end;

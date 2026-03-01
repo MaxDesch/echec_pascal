@@ -23,6 +23,7 @@ uses
 var
   running: Boolean;
   timerID :TSDL_TimerID;
+  s: String;
 
 function TimerCallback(interval: UInt32; param: Pointer): UInt32; cdecl;
 var
@@ -54,6 +55,7 @@ begin
 
   partie := Initialisation_partie();
   partie.gestionaire.Definir_Scalaire(@ratioscreen_x,@ratioscreen_y);
+  initialiser_menu_promotion(partie.menu_promotion);
   running := True;
 
   while running do
@@ -65,9 +67,11 @@ begin
 
     gerer_event_parametre(event, MenuParametre);
 
+
+
     if parametre_afficher = MENUPARAMPASAFFICHER then
     begin
-      case ancien_mode_affichage of
+      case mode_affichage of
         AFFMAINMENU: gerer_event_menu(event, MenuPrincipale);
         AFFMENUSOLO : gerer_event_menu(event, MenuSolo); 
         AFFMENUMULTI : gerer_event_menu(event, MenuMulti);
@@ -77,6 +81,12 @@ begin
     
     case event.type_ of
       SDL_QUITEV: running := False;
+      SDL_TEXTINPUT:
+        begin
+          // event.text.text est une C-string UTF-8
+          s := PAnsiChar(@event.text.text[0]); // ou UTF8ToString(PAnsiChar(...)) si besoin
+          Writeln('Texte saisi: ', s);
+        end;
       SDL_KEYDOWN: 
       // debug pas besoin de lire les événements clavier pour l'instant
       begin
@@ -99,13 +109,6 @@ begin
     SDL_SetRenderDrawColor(renderer, 125, 125, 125, 255);
     SDL_RenderClear(renderer);
 
-    // Gestion des changements de mode
-    if ancien_mode_affichage <> mode_affichage then
-    begin
-      changer_mode_affichage(mode_affichage);
-      ancien_mode_affichage := mode_affichage;
-    end;
-
     // Affichage selon le mode
     case mode_affichage of
       AFFMAINMENU: 
@@ -114,6 +117,8 @@ begin
       AFFMENUSOLO: MenuSolo.Draw(renderer);
       
       AFFMENUMULTI: MenuMulti.Draw(renderer);
+
+      AFFMENUREPLAY: MenuReplay.Draw(renderer);
 
       AFFPARTIE_ECHEC:
       begin

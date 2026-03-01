@@ -10,7 +10,7 @@ uses
   echec_utilitaire,
   affichage_class;
 
-procedure AfficherEchiquier(echiquier: Techiquier; renderer: PSDL_Renderer);
+// procedure AfficherEchiquier(echiquier: Techiquier; renderer: PSDL_Renderer);
 procedure AfficherPiece(echiquier: Techiquier; x, y: Integer; rect: TSDL_Rect; renderer: PSDL_Renderer);
 procedure InitialiserTextures(renderer: PSDL_Renderer);
 procedure DestroyTextures;
@@ -20,9 +20,8 @@ procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
 procedure InitialiserAllMenu;
 procedure gerer_event_menu(event: TSDL_Event; var menu: TMenu);
 procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
-procedure changer_mode_affichage(nouvelle_valeur: Integer);
 procedure gerer_event_parametre(event: TSDL_Event; var menu: TMenu);
-
+procedure initialiser_menu_promotion(menu : TMenuDeSelectionPiece);
 
 const
   SCREEN_WIDTH = 640 ;
@@ -70,6 +69,7 @@ var
   MenuReplay : TMenu;
   MenuSolo : TMenu;
   MenuMulti : TMenu;
+  
   
   
 implementation
@@ -149,6 +149,73 @@ begin
   point_selectionner := IMG_LoadTexture(renderer, 'image/point/selectione.png');
 end;
 
+procedure choixCavalier();
+var coup : TCoup; i: Integer; arr: array of TCoup;
+begin
+  arr := partie.echiquier.echiquier[partie.xPromo][partie.yPromo].coups_autoriser;
+  for i := 0 to Length(arr) - 1 do
+  begin
+    coup := arr[i];
+    if coup.promotion = CAVALIER then
+    begin
+      Writeln('coup trouvé : ' + IntToStr(coup.xDepart) + ',' + IntToStr(coup.yDepart) + ' -> ' + IntToStr(coup.xArrivee) + ',' + IntToStr(coup.yArrivee));
+      jouer_coup_definitivement(coup, partie, renderer);
+    end;
+  end;
+  partie.afficher_promotion := False;
+  Writeln('Promotion choisie : Cavalier');
+end;
+
+procedure choixFou();
+var coup : TCoup; i: Integer; arr: array of TCoup;
+begin
+  arr := partie.echiquier.echiquier[partie.xPromo][partie.yPromo].coups_autoriser;
+  for i := 0 to Length(arr) - 1 do
+  begin
+    coup := arr[i];
+    if coup.promotion = FOU then
+      jouer_coup_definitivement(coup, partie, renderer);
+  end;
+  partie.afficher_promotion := False;
+  Writeln('Promotion choisie : Fou');
+end;
+
+procedure choixTour();
+var coup : TCoup; i: Integer; arr: array of TCoup;
+begin
+  arr := partie.echiquier.echiquier[partie.xPromo][partie.yPromo].coups_autoriser;
+  for i := 0 to Length(arr) - 1 do
+  begin
+    coup := arr[i];
+    if coup.promotion = TOUR then
+      jouer_coup_definitivement(coup, partie, renderer);
+  end;
+  partie.afficher_promotion := False;
+  Writeln('Promotion choisie : Tour');
+end;
+
+procedure choixDame();
+var coup : TCoup; i: Integer; arr: array of TCoup;
+begin
+  arr := partie.echiquier.echiquier[partie.xPromo][partie.yPromo].coups_autoriser;
+  for i := 0 to Length(arr) - 1 do
+  begin
+    coup := arr[i];
+    if coup.promotion = DAME then
+      jouer_coup_definitivement(coup, partie, renderer);
+  end;
+  partie.afficher_promotion := False;
+  Writeln('Promotion choisie : Dame');
+end;
+
+procedure initialiser_menu_promotion(menu : TMenuDeSelectionPiece);
+begin
+  menu.assignerProcedure(@choixDame, 'Dame');
+  menu.assignerProcedure(@choixTour, 'Tour');
+  menu.assignerProcedure(@choixFou, 'Fou');
+  menu.assignerProcedure(@choixCavalier, 'Cavalier');
+end;
+
 procedure DestroyTextures;
 var piece: Integer;
 begin
@@ -165,46 +232,65 @@ begin
   SDL_DestroyTexture(point_selectionner);
 end;
 
+procedure set_up_nouvelle_partie(var partie: TPartie_echec);
+begin
+  partie.affichage_coup_blanc.vider(renderer);
+  partie.affichage_coup_noir.vider(renderer);
+  partie.echiquier := InitialiserEchiquier();
+
+  partie.piece_selectione.x := -1;
+  partie.piece_selectione.y := -1;
+  partie.afficher_promotion := False;
+
+  partie.gagnant := VIDE;
+
+  partie.timer_blanc := 30*60*10; // 30 minutes en dixièmes de seconde
+  partie.timer_noir := 30*60*10;
+
+  partie.couleur_joueur := BLANC;
+  partie.couleur_affichage := BLANC;
+  calculer_coup_couleur(partie, BLANC);
+end;
+
 procedure AfficherPiece(echiquier: Techiquier; x, y: Integer; rect: TSDL_Rect; renderer: PSDL_Renderer);
 var
   piece: Integer;
 begin
   piece := echiquier.echiquier[x, y].piece;
   if piece = VIDE then
-    Exit; // Ne rien afficher pour une case vide
-  // Charger la texture de la pièce en fonction de sa valeur
+    Exit;
   
   SDL_RenderCopy(renderer, texture_piece[piece], nil, @rect);
 end;
 
-procedure AfficherEchiquier(echiquier: Techiquier; renderer: PSDL_Renderer);
-var
-  i, j: Integer;
-  rect: TSDL_Rect;
-begin
-  for i := 0 to 7 do
-    for j := 0 to 7 do
-    begin
-      if couleur_affichage = BLANC then
-      begin
-        rect.x := (7 - j) * taille_case;
-        rect.y := (7 - i) * taille_case;
-      end
-      else
-      begin
-        rect.x := j * taille_case;
-        rect.y := i * taille_case;
-      end;
-      rect.w := taille_case;
-      rect.h := taille_case;
-      if (i + j) mod 2 = 0 then
-        SDL_SetRenderDrawColor(renderer, 240, 217, 181, 255) // Couleur claire
-      else
-        SDL_SetRenderDrawColor(renderer, 181, 136, 99, 255); // Couleur foncée
-      SDL_RenderFillRect(renderer, @rect);
-      AfficherPiece(echiquier, i, j, rect, renderer);
-    end;
-end;
+// procedure AfficherEchiquier(echiquier: Techiquier; renderer: PSDL_Renderer);
+// var
+//   i, j: Integer;
+//   rect: TSDL_Rect;
+// begin
+//   for i := 0 to 7 do
+//     for j := 0 to 7 do
+//     begin
+//       if couleur_affichage = BLANC then
+//       begin
+//         rect.x := (7 - j) * taille_case;
+//         rect.y := (7 - i) * taille_case;
+//       end
+//       else
+//       begin
+//         rect.x := j * taille_case;
+//         rect.y := i * taille_case;
+//       end;
+//       rect.w := taille_case;
+//       rect.h := taille_case;
+//       if (i + j) mod 2 = 0 then
+//         SDL_SetRenderDrawColor(renderer, 240, 217, 181, 255) // Couleur claire
+//       else
+//         SDL_SetRenderDrawColor(renderer, 181, 136, 99, 255); // Couleur foncée
+//       SDL_RenderFillRect(renderer, @rect);
+//       AfficherPiece(echiquier, i, j, rect, renderer);
+//     end;
+// end;
 
 procedure AfficherCase(renderer: PSDL_Renderer);
 var
@@ -353,6 +439,23 @@ begin
   AfficherAllPiece(partie,renderer);
   AfficherInformation(partie,renderer);
   partie.gestionaire.Draw(renderer);
+  if partie.afficher_promotion then
+    partie.menu_promotion.Draw(renderer);
+end;
+
+procedure BoutonAllerMenuSolo();
+begin
+  mode_affichage := AFFMENUSOLO;
+end;
+
+procedure BoutonAllerMenuMulti();
+begin
+  mode_affichage := AFFMENUMULTI;
+end;
+
+procedure BoutonAllerMenuReplay();
+begin
+  mode_affichage := AFFMENUREPLAY;
 end;
 
 procedure initialiserMenuPrincipal;
@@ -362,16 +465,22 @@ begin
   MenuPrincipale := TMenu.Create(couleurBG);
   bouton := TBouton.Create(100,75,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
   bouton.SetText(' allez au menu solo', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, AFFMENUSOLO);
+  bouton.SetProcedure(@BoutonAllerMenuSolo);
   MenuPrincipale.Ajouter_Bouton(bouton);
   bouton := TBouton.Create(100,140,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
   bouton.SetText(' allez au menu multi', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, AFFMENUMULTI);
+  bouton.SetProcedure(@BoutonAllerMenuMulti);
   MenuPrincipale.Ajouter_Bouton(bouton);
   bouton := TBouton.Create(100,205,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
   bouton.SetText(' allez au menu replay', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, AFFMENUREPLAY);
+  bouton.SetProcedure(@BoutonAllerMenuReplay);
   MenuPrincipale.Ajouter_Bouton(bouton);
+end;
+
+procedure BontonRetourMenu();
+begin
+    mode_affichage := AFFMAINMENU;
+    parametre_afficher := 0;
 end;
 
 procedure initialiserMenuParametre;
@@ -395,10 +504,15 @@ begin
 
   bouton := TBouton.Create(405,280,SCREEN_WIDTH div 4, SCREEN_HEIGHT div 12 , RGB(50,200,50), RGB(20,100,20));
   bouton.SetText('Retour au Menu', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, AFFMAINMENU);
-  bouton.Set_valeur_modifier(@parametre_afficher, 0);
+  bouton.SetProcedure(@BontonRetourMenu);
 
   MenuParametre.Ajouter_Bouton(bouton);
+end;
+
+procedure BoutonNouvellePartie();
+begin
+  mode_affichage := AFFPARTIE_ECHEC;
+  set_up_nouvelle_partie(partie);
 end;
 
 procedure initialiserMenuSolo;
@@ -408,14 +522,22 @@ begin
   MenuSolo := TMenu.Create(couleurBG);
   bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, 60, RGB(200,200,200), RGB(100,100,100));
   bouton.SetText('Nouvelle Partie 1v1', RGB(0,0,0), font_detailler);
-  bouton.Set_valeur_modifier(@mode_affichage, AFFPARTIE_ECHEC);
+  bouton.SetProcedure(@BoutonNouvellePartie);
   MenuSolo.Ajouter_Bouton(bouton);
 end;
+
+procedure InitialiserMenuReplay;
+begin
+  MenuReplay := TMenu.Create(RGB(50,50,50));
+  MenuReplay.Ajouter_AffichageScrollableCliquable(TAffichageScrollableCliquable.Create(100, 50, 400, 250, 10, 40, RGB(100,100,100)));
+end;
+
 
 procedure InitialiserAllMenu;
 begin
   initialiserMenuPrincipal;
   initialiserMenuSolo; 
+  InitialiserMenuReplay;
   initialiserMenuParametre;
 end;
 
@@ -425,6 +547,8 @@ begin
     SDL_MOUSEMOTION: 
     begin
       partie.gestionaire.gerer_motion(event.motion.yrel) ;
+      if partie.afficher_promotion then
+        partie.menu_promotion.gerer_hover(ratioscreen_x,ratioscreen_y);
     end;
     SDL_MOUSEWHEEL :
     begin
@@ -432,6 +556,11 @@ begin
     end;
     SDL_MOUSEBUTTONDOWN :
     begin
+      if partie.afficher_promotion then
+      begin
+        partie.menu_promotion.gerer_clique(ratioscreen_x,ratioscreen_y);
+        Exit;
+      end;
       partie.gestionaire.gerer_clique;
       if event.button.x > SCREEN_HEIGHT then
         Exit;
@@ -439,6 +568,7 @@ begin
       y := event.button.y div taille_case;
       gerer_clique(partie, x, y, renderer);
     end;
+
     SDL_MOUSEBUTTONUP:
       partie.gestionaire.gerer_declique;
 
@@ -449,6 +579,24 @@ begin
 end;
 
 procedure gerer_event_menu(event: TSDL_Event; var menu: TMenu);
+begin
+  case event.type_ of
+    SDL_MOUSEMOTION: 
+    begin
+      menu.gerer_hover(ratioscreen_x,ratioscreen_y);
+    end;
+    SDL_MOUSEBUTTONDOWN :
+    begin
+      menu.gerer_clique(ratioscreen_x,ratioscreen_y);
+    end;
+    SDL_MOUSEWHEEL :
+    begin
+      menu.gerer_motion(event.wheel.y);
+    end;
+  end;
+end;
+
+procedure gerer_event_selectionpiece(event: TSDL_Event; menu: TMenuDeSelectionPiece);
 begin
   case event.type_ of
     SDL_MOUSEMOTION: 
@@ -488,31 +636,5 @@ begin
   end;
 end;
 
-procedure set_up_nouvelle_partie(var partie: TPartie_echec);
-begin
-  partie.affichage_coup_blanc.vider(renderer);
-  partie.affichage_coup_noir.vider(renderer);
-  partie.echiquier := InitialiserEchiquier();
-
-  partie.gagnant := VIDE;
-
-  partie.timer_blanc := 30*60*10; // 30 minutes en dixièmes de seconde
-  partie.timer_noir := 30*60*10;
-
-  calculer_coup_couleur(partie, BLANC);
-end;
-
-procedure changer_mode_affichage(nouvelle_valeur: Integer);
-begin
-  mode_affichage := nouvelle_valeur;
-  case nouvelle_valeur of
-    AFFMAINMENU: ;
-    AFFPARTIE_ECHEC: begin
-      couleur_affichage := BLANC;
-      set_up_nouvelle_partie(partie);
-
-    end;
-  end;
-end;
 
 end.

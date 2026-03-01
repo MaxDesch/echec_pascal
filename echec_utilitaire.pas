@@ -65,6 +65,10 @@ Type
     affichage_coup_blanc,affichage_coup_noir : TAffichageScrollable;
     gestionaire : TGestionnaireTAffichageScrollable;
     font : PTTF_Font;
+    afficher_promotion : Boolean;
+    xPromo, yPromo : Integer;
+    menu_promotion : TMenuDeSelectionPiece;
+    liste_coup : array of TCoup;
   end;
 
 function InitialiserEchiquier(): Techiquier;
@@ -112,25 +116,7 @@ begin
   Result.echiquier[7, 5].piece := -FOU;
   Result.echiquier[7, 6].piece := -CAVALIER;
   Result.echiquier[7, 7].piece := -TOUR;
-    // Placer les autres pièces blanches
-  Result.echiquier[0, 0].coups_autoriser := [];
-  Result.echiquier[0, 1].coups_autoriser := [];
-  Result.echiquier[0, 2].coups_autoriser := [];
-  Result.echiquier[0, 3].coups_autoriser := [];
-  Result.echiquier[0, 4].coups_autoriser := [];
-  Result.echiquier[0, 5].coups_autoriser := [];
-  Result.echiquier[0, 6].coups_autoriser := [];
-  Result.echiquier[0, 7].coups_autoriser := [];
-  // Placer les autres pièces noires
-  Result.echiquier[7, 0].coups_autoriser := [];
-  Result.echiquier[7, 1].coups_autoriser := [];
-  Result.echiquier[7, 2].coups_autoriser := [];
-  Result.echiquier[7, 3].coups_autoriser := [];
-  Result.echiquier[7, 4].coups_autoriser := [];
-  Result.echiquier[7, 5].coups_autoriser := [];
-  Result.echiquier[7, 6].coups_autoriser := [];
-  Result.echiquier[7, 7].coups_autoriser := [];
-  // Initialisation des autres variables
+
   Result.roiblanc_x := 0;
   Result.roiblanc_y := 4;
   Result.roinoir_x := 7;
@@ -159,12 +145,16 @@ begin
 	Result.gagnant := VIDE ;
 	Result.timer_on := True; Result.cliquable := True; Result.afficher := True;
 	calculer_coup_couleur(Result,Result.couleur_joueur);
-  Result.affichage_coup_blanc := TAffichageScrollable.Create(375, 100, 100, 200, 5, RGB(0,0,0));
-  Result.affichage_coup_noir := TAffichageScrollable.Create(520, 100, 100, 200, 5, RGB(0,0,0));
+  Result.affichage_coup_blanc := TAffichageScrollable.Create(375, 100, 100, 200, 5, 12, RGB(0,0,0));
+  Result.affichage_coup_noir := TAffichageScrollable.Create(520, 100, 100, 200, 5, 12, RGB(0,0,0));
   Result.gestionaire := TGestionnaireTAffichageScrollable.Create;
   Result.gestionaire.Ajout_Affichage(@Result.affichage_coup_blanc);
   Result.gestionaire.Ajout_Affichage(@Result.affichage_coup_noir);
   Result.font := TTF_OpenFont('font/gau_font_cube/GAU_cube_B.TTF', 13);
+  Result.afficher_promotion := False;
+  Result.xPromo := -1; Result.yPromo := -1;
+  Result.menu_promotion := TMenuDeSelectionPiece.Create(Result.font);
+  Result.liste_coup := [];
 end;
 
 function EstPositionValide(x, y: Integer): Boolean;
@@ -265,6 +255,9 @@ begin
     echiquier.en_passant_noir.x := -1 ;
   if coup.pieceCapturee = EN_PASSANT then
     echiquier.echiquier[coup.xDepart][coup.yArrivee].piece := VIDE;
+
+  if coup.promotion <> 0 then
+    echiquier.echiquier[coup.xArrivee][coup.yArrivee].piece := coup.promotion * Couleur_piece(coup.pieceDeplacee);
   
 end;
 
@@ -396,7 +389,15 @@ begin
       for i := 0 to Length(tab_coup) - 1 do
       begin
         if (x = tab_coup[i].xArrivee) and (y = tab_coup[i].yArrivee) then
-          jouer_coup_definitivement(tab_coup[i],partie, renderer)
+          if (tab_coup[i].pieceDeplacee = PION) and (tab_coup[i].xArrivee = 7) or (tab_coup[i].xArrivee = 0) then
+          begin
+            partie.afficher_promotion := True;
+            partie.xPromo := tab_coup[i].xDepart; partie.yPromo := tab_coup[i].yDepart;
+            partie.piece_selectione.x := -1;
+            Exit;
+          end
+          else
+            jouer_coup_definitivement(tab_coup[i],partie, renderer);
       end;
     end;
   end;
@@ -420,7 +421,7 @@ begin
   begin
     jouer_coup(newCoup,echiquier);
     if Couleur_piece(pieceDep) = BLANC then
-     bool := is_king_in_check(echiquier,BLANC,echiquier.roiblanc_x,echiquier.roiblanc_y)
+      bool := is_king_in_check(echiquier,BLANC,echiquier.roiblanc_x,echiquier.roiblanc_y)
     else 
       bool := is_king_in_check(echiquier,NOIR,echiquier.roinoir_x,echiquier.roinoir_y);
     dejouer_coup(newCoup,echiquier);
@@ -428,6 +429,14 @@ begin
   end;
   SetLength(coups, Length(coups) + 1);
   coups[High(coups)] := newCoup;
+end;
+
+procedure ajouter_all_coup_promo(var coups: tab_Coup; xD, yD, xA, yA, pieceDep, pieceCap : Integer; rock:Boolean;echiquier:Techiquier; check_coup_valable: Boolean);
+begin
+  ajouter_coup(coups, xD, yD, xA, yA, pieceDep, pieceCap, DAME, rock, echiquier, check_coup_valable);
+  ajouter_coup(coups, xD, yD, xA, yA, pieceDep, pieceCap, TOUR, rock, echiquier, check_coup_valable);
+  ajouter_coup(coups, xD, yD, xA, yA, pieceDep, pieceCap, FOU, rock, echiquier, check_coup_valable);
+  ajouter_coup(coups, xD, yD, xA, yA, pieceDep, pieceCap, CAVALIER, rock, echiquier, check_coup_valable);
 end;
 
 procedure check_direction(echiquier: Techiquier; x,y, dir_x, dir_y: Integer; var tab: tab_Coup; check_coup_valable: Boolean);
@@ -514,21 +523,34 @@ begin
         // Pion blanc
         if EstPositionValide(x + 1, y) and (echiquier.echiquier[x + 1, y].piece = VIDE) then
         begin
-          ajouter_coup(Result, x, y, x + 1, y, PION, VIDE, 0, False, echiquier, check_coup_valable);
+          if (x + 1 = 7) then
+            ajouter_all_coup_promo(Result, x, y, x + 1, y, PION, VIDE, False, echiquier, check_coup_valable)
+          else
+            ajouter_coup(Result, x, y, x + 1, y, PION, VIDE, 0, False, echiquier, check_coup_valable);
         end;
-        // Ajouter la logique pour les captures et les promotions
+
+        // avancer de 2 cases si c'est le premier mouvement du pion
         if EstPositionValide(x + 2, y) and (x = 1) and (echiquier.echiquier[x + 1, y].piece = VIDE) and (echiquier.echiquier[x + 2, y].piece = VIDE) then
         begin
           ajouter_coup(Result, x, y, x + 2, y, PION, VIDE, 0, False, echiquier, check_coup_valable);
         end;
+
+        // Ajouter la logique pour les captures
         if EstPositionValide(x + 1, y + 1) and (echiquier.echiquier[x + 1, y + 1].piece < 0) then
         begin
-          ajouter_coup(Result, x, y, x + 1, y + 1, PION, echiquier.echiquier[x + 1, y + 1].piece, 0, False, echiquier, check_coup_valable);
+          if (x + 1 = 7) then
+            ajouter_all_coup_promo(Result, x, y, x + 1, y + 1, PION, echiquier.echiquier[x + 1, y + 1].piece, False, echiquier, check_coup_valable)
+          else
+            ajouter_coup(Result, x, y, x + 1, y + 1, PION, echiquier.echiquier[x + 1, y + 1].piece, 0, False, echiquier, check_coup_valable);
         end;
         if EstPositionValide(x + 1, y - 1) and (echiquier.echiquier[x + 1, y - 1].piece < 0) then
         begin
-          ajouter_coup(Result, x, y, x + 1, y - 1, PION, echiquier.echiquier[x + 1, y - 1].piece, 0, False, echiquier, check_coup_valable);
+          if (x + 1 = 7) then
+            ajouter_all_coup_promo(Result, x, y, x + 1, y - 1, PION, echiquier.echiquier[x + 1, y - 1].piece, False, echiquier, check_coup_valable)
+          else
+            ajouter_coup(Result, x, y, x + 1, y - 1, PION, echiquier.echiquier[x + 1, y - 1].piece, 0, False, echiquier, check_coup_valable);
         end;
+
         // en passant
         if (x = echiquier.en_passant_noir.x) and  (y + 1 = echiquier.en_passant_noir.y) then
         begin
@@ -544,21 +566,35 @@ begin
         // Pion noir
         if EstPositionValide(x - 1, y) and (echiquier.echiquier[x - 1, y].piece = VIDE) then
         begin
-          ajouter_coup(Result, x, y, x - 1, y, -PION, VIDE, 0, False, echiquier, check_coup_valable);
+          if (x - 1 = 0) then
+            ajouter_all_coup_promo(Result, x, y, x - 1, y, -PION, VIDE, False, echiquier, check_coup_valable)
+          else
+            ajouter_coup(Result, x, y, x - 1, y, -PION, VIDE, 0, False, echiquier, check_coup_valable);
         end;
-        // Ajouter la logique pour les captures et les promotions
+
+        // avancer de 2 cases si c'est le premier mouvement du pion
         if EstPositionValide(x - 2, y) and (x = 6) and (echiquier.echiquier[x - 1, y].piece = VIDE) and (echiquier.echiquier[x - 2, y].piece = VIDE) then
         begin
           ajouter_coup(Result, x, y, x - 2, y, -PION, VIDE, 0, False, echiquier, check_coup_valable);
         end;
+
+        // Ajouter la logique pour les captures
         if EstPositionValide(x - 1, y - 1) and (echiquier.echiquier[x - 1, y - 1].piece > 0) then
         begin
-          ajouter_coup(Result, x, y, x - 1, y - 1, -PION, echiquier.echiquier[x - 1, y - 1].piece, 0, False, echiquier, check_coup_valable);
+          if (x - 1 = 0) then
+            ajouter_all_coup_promo(Result, x, y, x - 1, y - 1, -PION, echiquier.echiquier[x - 1, y - 1].piece, False, echiquier, check_coup_valable)
+          else
+            ajouter_coup(Result, x, y, x - 1, y - 1, -PION, echiquier.echiquier[x - 1, y - 1].piece, 0, False, echiquier, check_coup_valable);
         end;
         if EstPositionValide(x - 1, y + 1) and (echiquier.echiquier[x - 1, y + 1].piece > 0) then
         begin
-          ajouter_coup(Result, x, y, x - 1, y + 1, -PION, echiquier.echiquier[x - 1, y + 1].piece, 0, False, echiquier, check_coup_valable);
+          if (x - 1 = 0) then
+            ajouter_all_coup_promo(Result, x, y, x - 1, y + 1, -PION, echiquier.echiquier[x - 1, y + 1].piece, False, echiquier, check_coup_valable)
+          else
+            ajouter_coup(Result, x, y, x - 1, y + 1, -PION, echiquier.echiquier[x - 1, y + 1].piece, 0, False, echiquier, check_coup_valable);
         end;
+
+        // en passant
         if (x = echiquier.en_passant_noir.x) and  (y + 1 = echiquier.en_passant_noir.y) then
         begin
           ajouter_coup(Result, x, y, x - 1, y + 1, -PION, EN_PASSANT, 0, False, echiquier, check_coup_valable);
@@ -676,12 +712,15 @@ end;
 procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec;renderer : PSDL_Renderer);
 begin
 	jouer_coup(coup,partie.echiquier);
+  SetLength(partie.liste_coup, Length(partie.liste_coup) + 1);
+  partie.liste_coup[Length(partie.liste_coup)-1] := coup;
   if partie.couleur_joueur = BLANC then
     partie.affichage_coup_blanc.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer)
   else
     partie.affichage_coup_noir.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer);
 	partie.couleur_joueur := -partie.couleur_joueur;
 	calculer_coup_couleur(partie,partie.couleur_joueur);
+  Writeln('Coup joue : ' + Coup_to_string(coup));
 end;
 
 procedure finir_partie(var partie:TPartie_echec;gagnant:Integer);
