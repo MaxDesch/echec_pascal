@@ -20,7 +20,9 @@ const
   ROI = 6;
   VIDE = 0;
   EN_PASSANT = 100;
-	DRAW = 10;
+  ECHEC = 10;
+	DRAW = 11;
+  MAT = 12;
 
 Type 
   TPos = record
@@ -66,7 +68,7 @@ Type
     gestionaire : TGestionnaireTAffichageScrollable;
     font : PTTF_Font;
     afficher_promotion : Boolean;
-    xPromo, yPromo : Integer;
+    xPromo, yPromo, yPromoArrive : Integer;
     menu_promotion : TMenuDeSelectionPiece;
     liste_coup : array of TCoup;
   end;
@@ -74,7 +76,7 @@ Type
 function InitialiserEchiquier(): Techiquier;
 function EstPositionValide(x, y: Integer): Boolean;
 function CoupsValides(echiquier: Techiquier; x, y: Integer; check_coup_valable: Boolean): tab_Coup;
-function is_king_in_check(echiquier: Techiquier; color, kingX, kingY: Integer): Boolean;
+function is_king_in_check(echiquier: Techiquier; color: Integer): Boolean;
 procedure calculer_coup_couleur(var partie:TPartie_echec;couleur:Integer);
 procedure gerer_clique(var partie:TPartie_echec;y,x:Integer;renderer : PSDL_Renderer);
 function Initialisation_partie(): TPartie_echec;
@@ -257,8 +259,10 @@ begin
     echiquier.echiquier[coup.xDepart][coup.yArrivee].piece := VIDE;
 
   if coup.promotion <> 0 then
+  begin
     echiquier.echiquier[coup.xArrivee][coup.yArrivee].piece := coup.promotion * Couleur_piece(coup.pieceDeplacee);
-  
+    writeln('promo');
+  end;
 end;
 
 procedure dejouer_coup(coup:TCoup;var echiquier:Techiquier);
@@ -392,7 +396,8 @@ begin
           if (tab_coup[i].pieceDeplacee = PION) and (tab_coup[i].xArrivee = 7) or (tab_coup[i].xArrivee = 0) then
           begin
             partie.afficher_promotion := True;
-            partie.xPromo := tab_coup[i].xDepart; partie.yPromo := tab_coup[i].yDepart;
+            partie.xPromo := tab_coup[i].xDepart ;partie.yPromo := tab_coup[i].yDepart;
+            partie.yPromoArrive := y;
             partie.piece_selectione.x := -1;
             Exit;
           end
@@ -421,9 +426,9 @@ begin
   begin
     jouer_coup(newCoup,echiquier);
     if Couleur_piece(pieceDep) = BLANC then
-      bool := is_king_in_check(echiquier,BLANC,echiquier.roiblanc_x,echiquier.roiblanc_y)
+      bool := is_king_in_check(echiquier,BLANC)
     else 
-      bool := is_king_in_check(echiquier,NOIR,echiquier.roinoir_x,echiquier.roinoir_y);
+      bool := is_king_in_check(echiquier,NOIR);
     dejouer_coup(newCoup,echiquier);
     if bool then Exit;
   end;
@@ -458,7 +463,7 @@ begin
     ajouter_coup(tab, start_x, start_y, x, y, piece, echiquier.echiquier[x, y].piece, 0, False, echiquier, check_coup_valable);
 end;
 
-function is_king_in_check(echiquier: Techiquier; color, kingX, kingY: Integer): Boolean;
+function is_king_in_check(echiquier: Techiquier; color: Integer): Boolean;
 var 
   i, j: Integer;
   enemyMoves: tab_Coup;
@@ -475,7 +480,7 @@ begin
         enemyMoves := CoupsValides(echiquier, i, j, False);
         for move in enemyMoves do
         begin
-          if (move.xArrivee = kingX) and (move.yArrivee = kingY) then
+          if (move.xArrivee = echiquier.roiblanc_x) and (move.yArrivee = echiquier.roiblanc_y) then
           begin
             Result := True;
             Exit;
@@ -487,7 +492,7 @@ begin
         enemyMoves := CoupsValides(echiquier, i, j, False);
         for move in enemyMoves do
         begin
-          if (move.xArrivee = kingX) and (move.yArrivee = kingY) then
+          if (move.xArrivee = echiquier.roinoir_x) and (move.yArrivee = echiquier.roinoir_y) then
           begin
             Result := True;
             Exit;
@@ -709,6 +714,37 @@ begin
     Result += ' x'
 end;
 
+procedure check_echec_mat(var partie:TPartie_echec);
+var 
+  i, j: Integer;
+  move: TCoup;
+  bool_echec,bool_draw:Boolean;
+  color : Integer;
+begin
+  bool_draw := True;
+  color := partie.couleur_joueur;
+  bool_echec := is_king_in_check(partie.echiquier,color);
+  for i := 0 to 7 do
+    for j := 0 to 7 do
+    begin
+    if bool_draw and (color = BLANC) and (partie.echiquier.echiquier[i, j].piece > VIDE) then
+      if length(partie.echiquier.echiquier[i, j].coups_autoriser) > 0 then
+        bool_draw := False;
+    if bool_draw and (color = NOIR) and (partie.echiquier.echiquier[i, j].piece < VIDE) then
+      if length(partie.echiquier.echiquier[i, j].coups_autoriser) > 0 then
+        bool_draw := False;
+    end;
+  if bool_draw and bool_echec then
+    finir_partie(partie,-color)
+  else if bool_draw then
+    finir_partie(partie,DRAW);
+  // else if bool_echec then
+  //   Result := ECHEC
+  if bool_echec then
+    writeln('echec');
+end;
+
+
 procedure jouer_coup_definitivement(coup:TCoup;var partie:TPartie_echec;renderer : PSDL_Renderer);
 begin
 	jouer_coup(coup,partie.echiquier);
@@ -720,6 +756,7 @@ begin
     partie.affichage_coup_noir.Ajouter_Surface(TTF_RenderText_Solid(partie.font, PChar(Coup_to_string(coup)), RGB(255,255,255)),renderer);
 	partie.couleur_joueur := -partie.couleur_joueur;
 	calculer_coup_couleur(partie,partie.couleur_joueur);
+  check_echec_mat(partie);
   Writeln('Coup joue : ' + Coup_to_string(coup));
 end;
 
@@ -728,6 +765,7 @@ begin
 	partie.gagnant := gagnant ;
 	partie.cliquable := False ;
 	partie.timer_on := False ;
+  writeln('le gagnant est : ',gagnant);
 end;
 
 end.

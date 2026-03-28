@@ -156,11 +156,8 @@ begin
   for i := 0 to Length(arr) - 1 do
   begin
     coup := arr[i];
-    if coup.promotion = CAVALIER then
-    begin
-      Writeln('coup trouvé : ' + IntToStr(coup.xDepart) + ',' + IntToStr(coup.yDepart) + ' -> ' + IntToStr(coup.xArrivee) + ',' + IntToStr(coup.yArrivee));
+    if (coup.promotion = CAVALIER) and (coup.yArrivee = partie.yPromoArrive) then
       jouer_coup_definitivement(coup, partie, renderer);
-    end;
   end;
   partie.afficher_promotion := False;
   Writeln('Promotion choisie : Cavalier');
@@ -173,7 +170,7 @@ begin
   for i := 0 to Length(arr) - 1 do
   begin
     coup := arr[i];
-    if coup.promotion = FOU then
+    if (coup.promotion = FOU) and (coup.yArrivee = partie.yPromoArrive) then
       jouer_coup_definitivement(coup, partie, renderer);
   end;
   partie.afficher_promotion := False;
@@ -187,7 +184,7 @@ begin
   for i := 0 to Length(arr) - 1 do
   begin
     coup := arr[i];
-    if coup.promotion = TOUR then
+    if (coup.promotion = TOUR) and (coup.yArrivee = partie.yPromoArrive) then
       jouer_coup_definitivement(coup, partie, renderer);
   end;
   partie.afficher_promotion := False;
@@ -201,7 +198,7 @@ begin
   for i := 0 to Length(arr) - 1 do
   begin
     coup := arr[i];
-    if coup.promotion = DAME then
+    if (coup.promotion = DAME) and (coup.yArrivee = partie.yPromoArrive) then
       jouer_coup_definitivement(coup, partie, renderer);
   end;
   partie.afficher_promotion := False;
@@ -246,6 +243,8 @@ begin
 
   partie.timer_blanc := 30*60*10; // 30 minutes en dixièmes de seconde
   partie.timer_noir := 30*60*10;
+  partie.cliquable := True;
+  partie.timer_on := True;
 
   partie.couleur_joueur := BLANC;
   partie.couleur_affichage := BLANC;
@@ -520,7 +519,7 @@ var couleurBG : TSDL_Color;
 begin
   couleurBG := RGB(50,50,50);
   MenuSolo := TMenu.Create(couleurBG);
-  bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, 60, RGB(200,200,200), RGB(100,100,100));
+  bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
   bouton.SetText('Nouvelle Partie 1v1', RGB(0,0,0), font_detailler);
   bouton.SetProcedure(@BoutonNouvellePartie);
   MenuSolo.Ajouter_Bouton(bouton);
@@ -532,12 +531,19 @@ begin
   MenuReplay.Ajouter_AffichageScrollableCliquable(TAffichageScrollableCliquable.Create(100, 50, 400, 250, 10, 40, RGB(100,100,100)));
 end;
 
+procedure InitialiserMenuMulti;
+begin
+  MenuMulti := TMenu.Create(RGB(50,50,50));
+  MenuMulti.Ajouter_AffichageScrollableCliquable(TAffichageScrollableCliquable.Create(100, 50, 400, 250, 10, 40, RGB(100,100,100)));
+end;
+
 
 procedure InitialiserAllMenu;
 begin
   initialiserMenuPrincipal;
   initialiserMenuSolo; 
   InitialiserMenuReplay;
+  InitialiserMenuMulti;
   initialiserMenuParametre;
 end;
 
