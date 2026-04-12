@@ -99,11 +99,14 @@ type
     FCouleurBG : TSDL_Color;
     FButtons : array of TBouton;
     FRect : array of rect_color;
+    FTextures : array of PSDL_Texture;
+    FRectTextures : array of TSDL_Rect;
     FAffichageScrollableCliquable : TAffichageScrollableCliquable;
   public
     constructor Create(AColorBG: TSDL_Color);
     procedure Ajouter_Bouton(bouton: TBouton);
     procedure Ajouter_Rect(r: rect_color);
+    procedure AjouterTexture(texture: PSDL_Texture; rect: TSDL_Rect);
     procedure Ajouter_AffichageScrollableCliquable(Aff : TAffichageScrollableCliquable);
     procedure Draw(ARenderer: PSDL_Renderer);
     procedure gerer_clique(dx,dy: Real);
@@ -580,6 +583,14 @@ begin
   FRect[Length(FRect) - 1] := r;
 end;
 
+procedure TMenu.AjouterTexture(texture: PSDL_Texture; rect: TSDL_Rect);
+begin
+  SetLength(FTextures, Length(FTextures) + 1);
+  FTextures[Length(FTextures) - 1] := texture;
+  SetLength(FRectTextures, Length(FRectTextures) + 1);
+  FRectTextures[Length(FTextures) - 1] := rect;
+end;
+
 procedure TMenu.Ajouter_AffichageScrollableCliquable(Aff: TAffichageScrollableCliquable);
 begin
   FAffichageScrollableCliquable := Aff;
@@ -598,6 +609,8 @@ begin
     SDL_SetRenderDrawColor(ARenderer, FRect[i].color.r, FRect[i].color.g, FRect[i].color.b, FRect[i].color.a);
     SDL_RenderFillRect(ARenderer, @FRect[i].rect);
   end;
+    for i := 0 to Length(FTextures) - 1 do
+      SDL_RenderCopy(ARenderer, FTextures[i], nil, @FRectTextures[i]);
   for i := 0 to Length(FButtons) - 1 do
     FButtons[i].Draw(ARenderer);
   if Assigned(FAffichageScrollableCliquable) then

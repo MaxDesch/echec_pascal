@@ -17,7 +17,7 @@ procedure DestroyTextures;
 procedure InitialiserSDL;
 procedure AfficherPartie(partie:TPartie_echec; renderer: PSDL_Renderer);
 procedure AfficherInformation(partie:TPartie_echec; renderer: PSDL_Renderer);
-procedure InitialiserAllMenu;
+procedure InitialiserAllMenu(renderer: PSDL_Renderer);
 procedure gerer_event_menu(event: TSDL_Event; var menu: TMenu);
 procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
 procedure gerer_event_parametre(event: TSDL_Event; var menu: TMenu);
@@ -69,6 +69,7 @@ var
   MenuReplay : TMenu;
   MenuSolo : TMenu;
   MenuMulti : TMenu;
+  MenuFinPartie : TMenu;
   
   
   
@@ -440,6 +441,8 @@ begin
   partie.gestionaire.Draw(renderer);
   if partie.afficher_promotion then
     partie.menu_promotion.Draw(renderer);
+  if partie.gagnant <> VIDE then
+    MenuFinPartie.Draw(renderer);
 end;
 
 procedure BoutonAllerMenuSolo();
@@ -537,14 +540,36 @@ begin
   MenuMulti.Ajouter_AffichageScrollableCliquable(TAffichageScrollableCliquable.Create(100, 50, 400, 250, 10, 40, RGB(100,100,100)));
 end;
 
+procedure InitialiserMenuFinPartie(renderer: PSDL_Renderer);
+var temp_bouton : TBouton;text : string;texture : PSDL_Texture;rect : TSDL_Rect;
+begin
+  MenuFinPartie := TMenu.Create(RGBA(50,50,50,0));
+  temp_bouton := TBouton.Create(100,150,SCREEN_WIDTH div 2 - 50, SCREEN_HEIGHT div 2 - 150, RGB(200,200,200), RGB(100,100,100));
+  temp_bouton.SetText('Retour au Menu', RGB(0,0,0), font_detailler);
+  temp_bouton.SetProcedure(@BontonRetourMenu);
+  MenuFinPartie.Ajouter_Bouton(temp_bouton);
+  case partie.gagnant of
+    BLANC: text := 'Le joueur blanc a gagné !';
+    NOIR: text := 'Le joueur noir a gagné !';
+    VIDE: text := 'Match nul !';
+  end;
+  rect.x := 100;
+  rect.y := 50;
+  rect.w := SCREEN_WIDTH - 200;
+  rect.h := 50;
+  texture := SDL_CreateTextureFromSurface(renderer, TTF_RenderText_Solid(font_detailler, PChar(text), RGB(0,0,0)));
+  MenuFinPartie.AjouterTexture(texture, rect);
 
-procedure InitialiserAllMenu;
+end;
+
+procedure InitialiserAllMenu(renderer: PSDL_Renderer);
 begin
   initialiserMenuPrincipal;
   initialiserMenuSolo; 
   InitialiserMenuReplay;
   InitialiserMenuMulti;
   initialiserMenuParametre;
+  InitialiserMenuFinPartie(renderer);
 end;
 
 procedure gerer_event_partie(event: TSDL_Event; var partie: TPartie_echec);
@@ -555,6 +580,8 @@ begin
       partie.gestionaire.gerer_motion(event.motion.yrel) ;
       if partie.afficher_promotion then
         partie.menu_promotion.gerer_hover(ratioscreen_x,ratioscreen_y);
+      if partie.gagnant <> VIDE then
+        MenuFinPartie.gerer_hover(ratioscreen_x,ratioscreen_y);
     end;
     SDL_MOUSEWHEEL :
     begin
@@ -567,12 +594,15 @@ begin
         partie.menu_promotion.gerer_clique(ratioscreen_x,ratioscreen_y);
         Exit;
       end;
+      if partie.gagnant <> VIDE then
+        MenuFinPartie.gerer_clique(ratioscreen_x,ratioscreen_y);
       partie.gestionaire.gerer_clique;
       if event.button.x > SCREEN_HEIGHT then
         Exit;
       x := event.button.x div taille_case;
       y := event.button.y div taille_case;
-      gerer_clique(partie, x, y, renderer);
+      if partie.cliquable then
+        gerer_clique(partie, x, y, renderer);
     end;
 
     SDL_MOUSEBUTTONUP:

@@ -46,7 +46,7 @@ end;
 begin
   InitialiserSDL;
   InitialiserTextures(renderer);
-  InitialiserAllMenu;
+  InitialiserAllMenu(renderer);
   
   timerID := SDL_AddTimer(100, @TimerCallback, nil);
 

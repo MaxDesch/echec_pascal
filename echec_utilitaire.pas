@@ -717,7 +717,6 @@ end;
 procedure check_echec_mat(var partie:TPartie_echec);
 var 
   i, j: Integer;
-  move: TCoup;
   bool_echec,bool_draw:Boolean;
   color : Integer;
 begin
